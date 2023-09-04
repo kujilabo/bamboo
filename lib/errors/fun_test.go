@@ -9,7 +9,7 @@ func TestAbc(t *testing.T) {
 		want int
 	}{
 		{
-			"a",
+			"b",
 			2,
 			4,
 		},
