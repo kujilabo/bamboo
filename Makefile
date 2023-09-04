@@ -126,9 +126,6 @@ docker-build:
 docker-run:
 	bazel run //src:go_image
 
-# work-init:
-# 	go work cocotola-api cocotola-translator-api lib
-
 dev-docker-up:
 	@docker compose -f docker/development/docker-compose.yml up -d
 	sleep 10
