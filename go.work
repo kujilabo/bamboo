@@ -3,5 +3,6 @@ go 1.21.0
 use (
 	./bamboo-app1
 	./bamboo-lib
+	./bamboo-request-controller
 	./lib
 )
