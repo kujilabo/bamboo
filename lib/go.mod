@@ -1,4 +1,4 @@
-module github.com/kujilabo/bamboo/bamboo-lib
+module github.com/kujilabo/bamboo/lib
 
 go 1.21.0
 
