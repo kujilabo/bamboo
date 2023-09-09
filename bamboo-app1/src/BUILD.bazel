@@ -7,10 +7,11 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//bamboo-app1/src/config",
+        "//bamboo-lib/request",
+        "//bamboo-lib/result",
         "//lib/config",
         "@com_github_google_uuid//:uuid",
         "@com_github_redis_go_redis_v9//:go-redis",
-        "@com_github_segmentio_kafka_go//:kafka-go",
         "@io_opentelemetry_go_otel//:otel",
         "@io_opentelemetry_go_otel//propagation",
         "@io_opentelemetry_go_otel_sdk//trace",
