@@ -18,7 +18,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/sync/errgroup"
 
-	bamboolib "github.com/kujilabo/bamboo/bamboo-lib"
+	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
 	"github.com/kujilabo/bamboo/bamboo-request-controller/src/config"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
@@ -48,7 +48,7 @@ func main() {
 
 	gracefulShutdownTime2 := time.Duration(cfg.Shutdown.TimeSec2) * time.Second
 
-	worker := NewBambooWorker(kafka.ReaderConfig{
+	worker := NewBambooKafkaRedisWorker(kafka.ReaderConfig{
 		Brokers:  []string{"localhost:29092"},
 		GroupID:  "consumer-group-id",
 		Topic:    "my-topic1",
@@ -77,7 +77,7 @@ type bambooWorker struct {
 	workerFn          WorkerFn
 }
 
-func NewBambooWorker(kafkaReaderConfig kafka.ReaderConfig, redisOptions redis.UniversalOptions, workerFn WorkerFn) BambooWorker {
+func NewBambooKafkaRedisWorker(kafkaReaderConfig kafka.ReaderConfig, redisOptions redis.UniversalOptions, workerFn WorkerFn) BambooWorker {
 	return &bambooWorker{
 		kafkaReaderConfig: kafkaReaderConfig,
 		redisOptions:      redisOptions,
@@ -128,7 +128,7 @@ func (w *bambooWorker) Run(ctx context.Context) error {
 		}
 		fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
 
-		req := bamboolib.ApplicationRequest{}
+		req := bamboorequest.ApplicationRequest{}
 		if err := json.Unmarshal(m.Value, &req); err != nil {
 			return err
 		}
@@ -231,7 +231,7 @@ func requestReader(ctx context.Context, kafkaReaderConfig kafka.ReaderConfig, fn
 		}
 		fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
 
-		req := bamboolib.ApplicationRequest{}
+		req := bamboorequest.ApplicationRequest{}
 		if err := json.Unmarshal(m.Value, &req); err != nil {
 			return err
 		}

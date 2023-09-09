@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
-	bamboolib "github.com/kujilabo/bamboo/bamboo-lib"
+	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
 	"github.com/kujilabo/bamboo/bamboo-request-controller/src/config"
 	"github.com/kujilabo/bamboo/bamboo-request-controller/src/sqls"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
@@ -58,7 +58,7 @@ func main() {
 	os.Exit(result)
 }
 
-func applicationRequestHandler(ctx context.Context, request bamboolib.ApplicationRequest) error {
+func applicationRequestHandler(ctx context.Context, request bamboorequest.ApplicationRequest) error {
 	// Write a retry information  to DB
 
 	// Send a message to the destination

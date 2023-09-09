@@ -1,4 +1,4 @@
-package lib
+package request
 
 type ApplicationRequest struct {
 	RequestID  string `json:"requestId"`
@@ -6,6 +6,7 @@ type ApplicationRequest struct {
 	MessageID  string `json:"messageId"`
 	ReceiverID string `json:"receiverId"`
 	Data       []byte `json:"data"`
+	Version    int    `json:"version"`
 }
 
 type HealthCheckRequest struct {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -16,21 +15,16 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	bamboorequest "github.com/kujilabo/bamboo-lib/request"
+	bambooresult "github.com/kujilabo/bamboo-lib/result"
 	"github.com/kujilabo/bamboo/bamboo-app1/src/config"
-	bamboolib "github.com/kujilabo/bamboo/bamboo-lib"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
-	liberrors "github.com/kujilabo/bamboo/lib/errors"
 )
-
-type StringResult struct {
-	Value string
-	Error error
-}
 
 func main() {
 	ctx := context.Background()
 	fmt.Println("bamboo-app1")
-	rp := NewKafkaBambooRequestProducer("localhost:29092", "my-topic1")
+	rp := bamboorequest.NewKafkaBambooRequestProducer("localhost:29092", "my-topic1")
 	defer rp.Close(ctx)
 	redisChannel, err := uuid.NewRandom()
 	if err != nil {
@@ -42,13 +36,13 @@ func main() {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			rs := NewRedisResultSubscriber(ctx)
+			rs := bambooresult.NewRedisResultSubscriber(ctx)
 
-			ch := make(chan StringResult)
+			ch := make(chan bambooresult.StringResult)
 			go func() {
 				result, err := rs.SubscribeString(ctx, redisChannel.String(), time.Second*3)
 
-				ch <- StringResult{Value: result, Error: err}
+				ch <- bambooresult.StringResult{Value: result, Error: err}
 			}()
 
 			rp.Send(ctx, "abc", "def", redisChannel.String(), map[string]int{"x": 3, "y": 5})
@@ -77,113 +71,6 @@ func main() {
 	// 		}
 	// 	}
 	// }
-}
-
-type BambooResultSubscriber interface {
-	SubscribeString(ctx context.Context, receiverID string, timeout time.Duration) (string, error)
-}
-
-type RedisResultSubscriber struct {
-	rdb redis.UniversalClient
-}
-
-func NewRedisResultSubscriber(ctx context.Context) BambooResultSubscriber {
-	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
-		Addrs:    []string{"localhost:6379"},
-		Password: "", // no password set
-	})
-	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		panic(err)
-	}
-
-	return &RedisResultSubscriber{
-		rdb: rdb,
-	}
-}
-
-func (s *RedisResultSubscriber) SubscribeString(ctx context.Context, receiverID string, timeout time.Duration) (string, error) {
-	pubsub := s.rdb.Subscribe(ctx, receiverID)
-	defer pubsub.Close()
-	c1 := make(chan StringResult, 1)
-
-	go func() {
-		msg, err := pubsub.ReceiveMessage(ctx)
-		if err != nil {
-			c1 <- StringResult{Value: "", Error: err}
-			return
-		}
-		c1 <- StringResult{Value: msg.Payload, Error: nil}
-	}()
-
-	select {
-	case res := <-c1:
-		if res.Error != nil {
-			return "", res.Error
-		}
-		return res.Value, nil
-	case <-time.After(timeout):
-		return "", errors.New("timeout")
-	}
-}
-
-type BambooRequestProducer interface {
-	Send(ctx context.Context, requestID, traceID, receiverID string, data interface{}) error
-	Close(ctx context.Context) error
-}
-
-type KafkaBambooProducer struct {
-	writer *kafka.Writer
-}
-
-func NewKafkaBambooRequestProducer(addr, topic string) BambooRequestProducer {
-	writer := &kafka.Writer{
-		Addr:     kafka.TCP(addr),
-		Topic:    topic,
-		Balancer: &kafka.LeastBytes{},
-	}
-
-	return &KafkaBambooProducer{
-		writer: writer,
-	}
-}
-
-func (p *KafkaBambooProducer) Send(ctx context.Context, requestID, traceID, receiverID string, data interface{}) error {
-	messageID, err := uuid.NewRandom()
-	if err != nil {
-		return err
-	}
-
-	dataJson, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	req := bamboolib.ApplicationRequest{
-		RequestID:  requestID,
-		TraceID:    traceID,
-		MessageID:  messageID.String(),
-		ReceiverID: receiverID,
-		Data:       dataJson,
-	}
-	bytes, err := json.Marshal(req)
-	if err != nil {
-		return err
-	}
-	if err := p.writer.WriteMessages(context.Background(),
-		kafka.Message{
-			Key:   []byte(messageID.String()),
-			Value: bytes,
-		},
-	); err != nil {
-		return liberrors.Errorf("failed to write. err: %w", err)
-		// return err
-	}
-
-	return nil
-}
-
-func (p *KafkaBambooProducer) Close(ctx context.Context) error {
-	return p.writer.Close()
 }
 
 func initialize(ctx context.Context, env string) (*config.Config, *sdktrace.TracerProvider, redis.UniversalClient) {
