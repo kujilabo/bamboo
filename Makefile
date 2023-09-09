@@ -84,9 +84,6 @@ update-mod:
 	@pushd ./bamboo-app1/ && \
 		go get -u ./... && \
 	popd
-	@pushd ./bamboo-request-controller/ && \
-		go get -u ./... && \
-	popd
 	@pushd ./bamboo-lib/ && \
 		go get -u ./... && \
 	popd

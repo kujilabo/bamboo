@@ -20,7 +20,7 @@ type RedisResultSubscriber struct {
 func NewRedisResultSubscriber(ctx context.Context) BambooResultSubscriber {
 	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
 		Addrs:    []string{"localhost:6379"},
-		Password: "", // no password set
+		Password: "", // no password setlll
 	})
 	if _, err := rdb.Ping(ctx).Result(); err != nil {
 		panic(err)

@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 
-	bamboomessage "github.com/kujilabo/bamboo/bamboo-lib/message"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
 )
 
@@ -38,7 +37,7 @@ func (p *kafkaBambooRequestProducer) Send(ctx context.Context, requestID, traceI
 		return err
 	}
 
-	req := bamboomessage.ApplicationRequest{
+	req := ApplicationRequest{
 		RequestID:  requestID,
 		TraceID:    traceID,
 		MessageID:  messageID.String(),

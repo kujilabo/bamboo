@@ -9,6 +9,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+
+	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
 )
 
 type kafkaRedisBambooWorker struct {

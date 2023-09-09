@@ -9,6 +9,7 @@ go_library(
     importpath = "github.com/kujilabo/bamboo/bamboo-lib/worker",
     visibility = ["//visibility:public"],
     deps = [
+        "//bamboo-lib/request",
         "@com_github_redis_go_redis_v9//:go-redis",
         "@com_github_segmentio_kafka_go//:kafka-go",
     ],
