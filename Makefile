@@ -100,7 +100,7 @@ work-init:
 	@go work init
 
 work-use:
-	@go work use -r .
+	@go work use bamboo-app1 bamboo-app2 bamboo-request-controller bamboo-lib lib
 
 gazelle:
 	# sudo chmod 777 -R docker/development
@@ -113,6 +113,9 @@ build:
 
 run-app1:
 	@bazel run //bamboo-app1/src
+
+run-worker1:
+	@bazel run //bamboo-worker1/src
 
 run-request-controller:
 	@bazel run //bamboo-request-controller/src

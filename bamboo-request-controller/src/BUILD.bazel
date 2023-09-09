@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/kujilabo/bamboo/bamboo-request-controller/src",
     visibility = ["//visibility:private"],
     deps = [
+        "//bamboo-lib",
         "//bamboo-request-controller/src/config",
         "//bamboo-request-controller/src/sqls",
         "//lib/config",

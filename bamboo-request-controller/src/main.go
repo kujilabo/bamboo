@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
+	bamboolib "github.com/kujilabo/bamboo/bamboo-lib"
 	"github.com/kujilabo/bamboo/bamboo-request-controller/src/config"
 	"github.com/kujilabo/bamboo/bamboo-request-controller/src/sqls"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
@@ -41,7 +42,7 @@ func main() {
 	flag.Parse()
 	appEnv := getValue(*env, os.Getenv("APP_ENV"), "local")
 	logrus.Infof("env: %s", appEnv)
-	fmt.Println("bamboo-app1")
+	fmt.Println("bamboo-request-controller")
 	liberrors.Errorf("aa")
 
 	cfg, _, sqlDB, tp := initialize(ctx, appEnv)
@@ -56,8 +57,12 @@ func main() {
 	logrus.Info("exited")
 	os.Exit(result)
 }
-func a(ctx context.Context) {
 
+func applicationRequestHandler(ctx context.Context, request bamboolib.ApplicationRequest) error {
+	// Write a retry information  to DB
+
+	// Send a message to the destination
+	return nil
 }
 
 func run(ctx context.Context, cfg *config.Config) int {

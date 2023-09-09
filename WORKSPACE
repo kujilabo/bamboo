@@ -5185,4 +5185,32 @@ go_repository(
     version = "v0.5.0",
 )
 
+go_repository(
+    name = "com_github_bsm_ginkgo_v2",
+    importpath = "github.com/bsm/ginkgo/v2",
+    sum = "h1:rtVBYPs3+TC5iLUVOis1B9tjLTup7Cj5IfzosKtvTJ0=",
+    version = "v2.9.5",
+)
+
+go_repository(
+    name = "com_github_bsm_gomega",
+    importpath = "github.com/bsm/gomega",
+    sum = "h1:LhQm+AFcgV2M0WyKroMASzAzCAJVpAxQXv4SaI9a69Y=",
+    version = "v1.26.0",
+)
+
+go_repository(
+    name = "com_github_dgryski_go_rendezvous",
+    importpath = "github.com/dgryski/go-rendezvous",
+    sum = "h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=",
+    version = "v0.0.0-20200823014737-9f7001d12a5f",
+)
+
+go_repository(
+    name = "com_github_redis_go_redis_v9",
+    importpath = "github.com/redis/go-redis/v9",
+    sum = "h1:137FnGdk+EQdCbye1FW+qOEcY5S+SpY9T0NiuqvtfMY=",
+    version = "v9.1.0",
+)
+
 gazelle_dependencies()

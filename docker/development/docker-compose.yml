@@ -1,0 +1,83 @@
+---
+version: '3'
+services:
+  kafka:
+    image: confluentinc/cp-kafka
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:32181
+      KAFKA_LISTENERS: EXTERNAL_SAME_HOST://:29092,INTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL_SAME_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL_SAME_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - 29092:29092
+    depends_on:
+      - zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 32181
+  dev-mysql:
+    image: mysql:8.0.27
+    container_name: dev-mysql
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_bin
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: development
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - 3306:3306
+    volumes:
+      - "./mysql-data:/var/lib/mysql"
+#   dev-translator-mysql:
+#     image: mysql:8.0.27
+#     container_name: dev-translator-mysql
+#     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_bin
+#     environment:
+#       MYSQL_ROOT_PASSWORD: mysql
+#       MYSQL_PORT: 3306
+#       MYSQL_DATABASE: development
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     ports:
+#       - 3316:3306
+#     volumes:
+#       - "./mysql-data-translator:/var/lib/mysql"
+#   dev-tatoeba-mysql:
+#     image: mysql:8.0.27
+#     container_name: dev-tatoeba-mysql
+#     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_bin
+#     environment:
+#       MYSQL_ROOT_PASSWORD: mysql
+#       MYSQL_PORT: 3306
+#       MYSQL_DATABASE: development
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     ports:
+#       - 3326:3306
+#     volumes:
+#       - "./mysql-data-tatoeba:/var/lib/mysql"
+#   dev-synthesizer-mysql:
+#     image: mysql:8.0.27
+#     container_name: dev-synthesizer-mysql
+#     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_bin
+#     environment:
+#       MYSQL_ROOT_PASSWORD: mysql
+#       MYSQL_PORT: 3306
+#       MYSQL_DATABASE: development
+#       MYSQL_USER: user
+#       MYSQL_PASSWORD: password
+#     ports:
+#       - 3336:3306
+#     volumes:
+#       - "./mysql-data-synthesizer:/var/lib/mysql"
+
+#   dev-jaeger:
+#     image: jaegertracing/all-in-one:1.33.0
+#     container_name: dev-jaeger
+#     ports:
+#       - 14268:14268
+#       - 16686:16686

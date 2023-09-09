@@ -56,6 +56,7 @@ go_library(
         "sqlite3/2022010101_create_english_sentence_problem.up.sql",
         "sqlite3/2022010102_create_english_phrase_problem.up.sql",
         "sqlite3/2022010103_create_english_word_problem.up.sql",
+        "mysql/20220901_create_request.up.sql",
     ],
     importpath = "github.com/kujilabo/bamboo/bamboo-request-controller/src/sqls",
     visibility = ["//visibility:public"],

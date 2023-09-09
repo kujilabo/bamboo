@@ -1,0 +1,34 @@
+@startuml
+autonumber 1
+
+participant App
+participant Worker1
+participant Worker2
+participant Kafka_Topic1
+participant Kafka_Topic2
+participant Redis
+
+Worker1 -> Kafka_Topic1: Subscribe channel for worker1
+Worker2 -> Kafka_Topic2: Subscribe channel for worker2
+
+group Worker1
+
+App --> Redis: Subscribe channel for this request
+App -> Kafka_Topic1: Send message
+Worker1 <- Kafka_Topic1: Recv message
+Worker1 -> Redis: Publish result
+App <- Redis: Get result
+
+end
+
+group Worker2
+
+App --> Redis: Subscribe channel for this request
+App -> Kafka_Topic2: Send message
+Worker2 <- Kafka_Topic2: Recv message
+Worker2 -> Redis: Publish result
+App <- Redis: Get result
+
+end
+
+@enduml
