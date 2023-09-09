@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "request",
+    srcs = [
+        "kafka_request_producer.go",
+        "request.go",
+        "request_producer.go",
+    ],
+    importpath = "github.com/kujilabo/bamboo/bamboo-lib/request",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//lib/errors",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_segmentio_kafka_go//:kafka-go",
+    ],
+)

@@ -6,7 +6,7 @@ go_library(
     importpath = "github.com/kujilabo/bamboo/bamboo-worker1/src",
     visibility = ["//visibility:private"],
     deps = [
-        "//bamboo-lib",
+        "//bamboo-lib/request",
         "//bamboo-request-controller/src/config",
         "//lib/config",
         "//lib/errors",
