@@ -3,8 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "config",
     srcs = ["config.go"],
-    embedsrcs = ["local.yml"],
-    importpath = "github.com/kujilabo/bamboo/bamboo-request-controller/src/config",
+    embedsrcs = ["debug.yml"],
+    importpath = "github.com/kujilabo/bamboo/bamboo-worker1/src/config",
     visibility = ["//visibility:public"],
     deps = [
         "//lib/config",

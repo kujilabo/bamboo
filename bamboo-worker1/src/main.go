@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	bambooworker "github.com/kujilabo/bamboo/bamboo-lib/worker"
-	"github.com/kujilabo/bamboo/bamboo-request-controller/src/config"
+	"github.com/kujilabo/bamboo/bamboo-worker1/src/config"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
 )
 
@@ -33,26 +33,27 @@ func getValue(values ...string) string {
 
 func main() {
 	ctx := context.Background()
-	env := flag.String("env", "", "environment")
+	mode := flag.String("mode", "", "")
 	flag.Parse()
-	appEnv := getValue(*env, os.Getenv("APP_ENV"), "local")
-	logrus.Infof("env: %s", appEnv)
+	appMode := getValue(*mode, os.Getenv("APP_MODE"), "debug")
+	logrus.Infof("mode: %s", appMode)
 	fmt.Println("bamboo-worker1")
 
-	cfg, tp, rdb := initialize(ctx, appEnv)
-	defer rdb.Close()
+	cfg, tp := initialize(ctx, appMode)
 	defer tp.ForceFlush(ctx) // flushes any pending spans
+
+	logrus.Infof("config: %+v", cfg.Worker.Kafka)
 
 	gracefulShutdownTime2 := time.Duration(cfg.Shutdown.TimeSec2) * time.Second
 
 	worker := bambooworker.NewKafkaRedisBambooWorker(kafka.ReaderConfig{
-		Brokers:  []string{"localhost:29092"},
-		GroupID:  "consumer-group-id",
-		Topic:    "my-topic1",
+		Brokers:  cfg.Worker.Kafka.Brokers,
+		GroupID:  cfg.Worker.Kafka.GroupID,
+		Topic:    cfg.Worker.Kafka.Topic,
 		MaxBytes: 10e6, // 10MB
 	}, redis.UniversalOptions{
-		Addrs:    []string{"localhost:6379"},
-		Password: "", // no password set
+		Addrs:    cfg.Worker.Redis.Addrs,
+		Password: cfg.Worker.Redis.Password,
 	}, workerFn)
 
 	result := run(ctx, cfg, worker)
@@ -81,14 +82,14 @@ func run(ctx context.Context, cfg *config.Config, worker bambooworker.BambooWork
 	return 0
 }
 
-func initialize(ctx context.Context, env string) (*config.Config, *sdktrace.TracerProvider, redis.UniversalClient) {
-	cfg, err := config.LoadConfig(env)
+func initialize(ctx context.Context, mode string) (*config.Config, *sdktrace.TracerProvider) {
+	cfg, err := config.LoadConfig(mode)
 	if err != nil {
 		panic(err)
 	}
 
 	// init log
-	if err := libconfig.InitLog(env, cfg.Log); err != nil {
+	if err := libconfig.InitLog(mode, cfg.Log); err != nil {
 		panic(err)
 	}
 
@@ -100,15 +101,7 @@ func initialize(ctx context.Context, env string) (*config.Config, *sdktrace.Trac
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
-	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
-		Addrs:    []string{"localhost:6379"},
-		Password: "", // no password set
-	})
-	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		panic(err)
-	}
-
-	return cfg, tp, rdb
+	return cfg, tp
 }
 
 func workerFn(ctx context.Context, reqBytes []byte) ([]byte, error) {

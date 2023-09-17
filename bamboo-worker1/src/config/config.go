@@ -18,23 +18,20 @@ type AppConfig struct {
 	MetricsPort int    `yaml:"metricsPort" validate:"required"`
 }
 
-type RequestProducerConfig struct {
-	Type  string                      `yaml:"type" validate:"required"`
-	Kafka *KafkaRequestProducerConfig `yaml:"kafka"`
+type WorkerConfig struct {
+	Kafka *KafkaWorkerConfig `yaml:"kafka"`
+	Redis *RedisWorkerConfig `yaml:"redis"`
 }
 
-type KafkaRequestProducerConfig struct {
-	Addr string `yaml:"addr" validate:"required"`
+type KafkaWorkerConfig struct {
+	Brokers []string `yaml:"brokers" validate:"required"`
+	GroupID string   `yaml:"groupId" validate:"required"`
+	Topic   string   `yaml:"topic" validate:"required"`
 }
 
-type RedisResultSubscriberConfig struct {
+type RedisWorkerConfig struct {
 	Addrs    []string `yaml:"addrs" validate:"required"`
 	Password string   `yaml:"password"`
-}
-
-type ResultSubscriberConfig struct {
-	Type  string                       `yaml:"type" validate:"required"`
-	Redis *RedisResultSubscriberConfig `yaml:"redis"`
 }
 
 type ShutdownConfig struct {
@@ -48,23 +45,21 @@ type DebugConfig struct {
 }
 
 type Config struct {
-	App              *AppConfig               `yaml:"app" validate:"required"`
-	RequestProducer  *RequestProducerConfig   `yaml:"requestProducer" validate:"required"`
-	ResultSubscriber *ResultSubscriberConfig  `yaml:"resultSubscriber" validate:"required"`
-	Trace            *libconfig.TraceConfig   `yaml:"trace" validate:"required"`
-	Shutdown         *ShutdownConfig          `yaml:"shutdown" validate:"required"`
-	Log              *libconfig.LogConfig     `yaml:"log" validate:"required"`
-	Swagger          *libconfig.SwaggerConfig `yaml:"swagger" validate:"required"`
-	Debug            *DebugConfig             `yaml:"debug"`
+	App      *AppConfig             `yaml:"app" validate:"required"`
+	Worker   *WorkerConfig          `yaml:"worker" validate:"required"`
+	Trace    *libconfig.TraceConfig `yaml:"trace" validate:"required"`
+	Shutdown *ShutdownConfig        `yaml:"shutdown" validate:"required"`
+	Log      *libconfig.LogConfig   `yaml:"log" validate:"required"`
+	Debug    *DebugConfig           `yaml:"debug"`
 }
 
-// //go:embed production.yml
+// //go:embed run.yml
 
 //go:embed debug.yml
 var config embed.FS
 
-func LoadConfig(env string) (*Config, error) {
-	filename := env + ".yml"
+func LoadConfig(mode string) (*Config, error) {
+	filename := mode + ".yml"
 	confContent, err := config.ReadFile(filename)
 	if err != nil {
 		return nil, liberrors.Errorf("config.ReadFile. filename: %s, err: %w", filename, err)

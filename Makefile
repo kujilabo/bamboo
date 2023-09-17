@@ -97,7 +97,7 @@ work-init:
 	@go work init
 
 work-use:
-	@go work use bamboo-app1 bamboo-app2 bamboo-request-controller bamboo-lib lib
+	@go work use bamboo-app1 bamboo-worker1 bamboo-lib lib
 
 gazelle:
 	# sudo chmod 777 -R docker/development
@@ -132,9 +132,9 @@ dev-docker-up:
 	# @chmod -R 777 docker/test
 
 dev-docker-down:
-	@docker-compose -f docker/development/docker-compose.yml down
+	@docker compose -f docker/development/docker-compose.yml down
 	sleep 10
-	@chmod -R 777 docker/test
+	# @chmod -R 777 docker/test
 
 dev-docker-clean:
 	@rm -rf docker/development/mysql-*

@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//bamboo-lib/worker",
-        "//bamboo-request-controller/src/config",
+        "//bamboo-worker1/src/config",
         "//lib/config",
         "@com_github_redis_go_redis_v9//:go-redis",
         "@com_github_segmentio_kafka_go//:kafka-go",

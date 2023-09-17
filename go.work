@@ -4,6 +4,5 @@ use (
 	./bamboo-app1
 	./bamboo-worker1
 	./bamboo-lib
-	./bamboo-request-controller
 	./lib
 )

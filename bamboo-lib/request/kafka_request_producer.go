@@ -26,36 +26,36 @@ func NewKafkaBambooRequestProducer(addr, topic string) BambooRequestProducer {
 	}
 }
 
-func (p *kafkaBambooRequestProducer) Send(ctx context.Context, requestID, traceID, receiverID string, data interface{}) error {
-	messageID, err := uuid.NewRandom()
+func (p *kafkaBambooRequestProducer) Send(ctx context.Context, traceID, resultChannel string, data []byte) error {
+	requestID, err := uuid.NewRandom()
 	if err != nil {
-		return err
+		return liberrors.Errorf("uuid.NewRandom. err: %w", err)
 	}
 
-	dataJson, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
+	// dataJson, err := json.Marshal(data)
+	// if err != nil {
+	// 	return err
+	// }
 
 	req := ApplicationRequest{
-		RequestID:  requestID,
-		TraceID:    traceID,
-		MessageID:  messageID.String(),
-		ReceiverID: receiverID,
-		Data:       dataJson,
+		RequestID:     requestID.String(),
+		TraceID:       traceID,
+		ResultChannel: resultChannel,
+		Data:          data,
 	}
-	bytes, err := json.Marshal(req)
+
+	reqBytes, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return liberrors.Errorf("json.Marshal. err: %w", err)
 	}
+
 	if err := p.writer.WriteMessages(context.Background(),
 		kafka.Message{
-			Key:   []byte(messageID.String()),
-			Value: bytes,
+			Key:   []byte(requestID.String()),
+			Value: reqBytes,
 		},
 	); err != nil {
-		return liberrors.Errorf("failed to write. err: %w", err)
-		// return err
+		return liberrors.Errorf("write. err: %w", err)
 	}
 
 	return nil

@@ -17,18 +17,19 @@ type RedisResultSubscriber struct {
 	rdb redis.UniversalClient
 }
 
-func NewRedisResultSubscriber(ctx context.Context) BambooResultSubscriber {
-	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
-		Addrs:    []string{"localhost:6379"},
-		Password: "", // no password setlll
-	})
-	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		panic(err)
-	}
+func NewRedisResultSubscriber(ctx context.Context, redisConfig *redis.UniversalOptions) BambooResultSubscriber {
+	rdb := redis.NewUniversalClient(redisConfig)
 
 	return &RedisResultSubscriber{
 		rdb: rdb,
 	}
+}
+func (s *RedisResultSubscriber) Ping(ctx context.Context) error {
+	if _, err := s.rdb.Ping(ctx).Result(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *RedisResultSubscriber) SubscribeString(ctx context.Context, receiverID string, timeout time.Duration) (string, error) {

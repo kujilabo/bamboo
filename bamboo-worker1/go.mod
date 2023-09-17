@@ -1,4 +1,4 @@
-module github.com/kujilabo/bamboo/bamboo-app2
+module github.com/kujilabo/bamboo/bamboo-worker1
 
 go 1.21.0
 

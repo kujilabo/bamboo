@@ -12,6 +12,7 @@ go_library(
         "//lib/config",
         "@com_github_google_uuid//:uuid",
         "@com_github_redis_go_redis_v9//:go-redis",
+        "@com_github_sirupsen_logrus//:logrus",
         "@io_opentelemetry_go_otel//:otel",
         "@io_opentelemetry_go_otel//propagation",
         "@io_opentelemetry_go_otel_sdk//trace",
