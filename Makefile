@@ -114,6 +114,9 @@ run-app1:
 run-worker1:
 	@bazel run //bamboo-worker1/src
 
+run-worker-redis-redis:
+	@bazel run //bamboo-worker-redis-redis/src
+
 run-request-controller:
 	@bazel run //bamboo-request-controller/src
 

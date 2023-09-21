@@ -93,8 +93,51 @@ func (a *app) call(ctx context.Context, callee string, param BambooPrameter, tim
 	if result.Error != nil {
 		return 0, result.Error
 	}
-	fmt.Println(result.Value)
-	return 10, nil
+	resultMap := map[string]int{}
+	if err := json.Unmarshal([]byte(result.Value), &resultMap); err != nil {
+		return 0, err
+	}
+	value, ok := resultMap["value"]
+	if !ok {
+		return 0, errors.New("ValueNOtFound")
+	}
+	return value, nil
+}
+
+type expr struct {
+	app *app
+	err error
+	mu  sync.Mutex
+}
+
+func (e *expr) getError() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.err != nil {
+		return e.err
+	}
+	return nil
+}
+
+func (e *expr) setError(err error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.err = err
+}
+
+func (e *expr) worker1(ctx context.Context, x, y int) int {
+	if err := e.getError(); err != nil {
+		return 0
+	}
+
+	val, err := e.app.call(ctx, "worker1", &worker1Parameter{
+		x: x, y: y,
+	}, time.Second*10)
+	if err != nil {
+		e.setError(err)
+		return 0
+	}
+	return val
 }
 
 func main() {
@@ -127,33 +170,22 @@ func main() {
 
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			val, err := app.call(ctx, "worker1", &worker1Parameter{
-				x: 3,
-				y: 5,
-			}, time.Second*10)
-			if err != nil {
-				panic(err)
+			e := expr{
+				app: &app,
 			}
-			fmt.Println(val)
+			c := e.worker1(ctx, 3, 5)
+			d := e.worker1(ctx, c, 3)
+			f := e.worker1(ctx, d, 2)
+
+			fmt.Println(f)
+			fmt.Println(e.err)
 		}()
 	}
 	wg.Wait()
-
-	// t := time.NewTicker(3 * time.Second) // 3秒おきに通知
-	// for {
-	// 	select {
-	// 	case <-t.C:
-	// 		// 3秒経過した。ここで何かを行う。
-	// 		if err := run(); err != nil {
-	// 			t.Stop() // タイマを止める。
-	// 			panic(err)
-	// 		}
-	// 	}
-	// }
 }
 
 func initialize(ctx context.Context, env string) (*config.Config, *sdktrace.TracerProvider) {

@@ -3,13 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "src_lib",
     srcs = ["main.go"],
-    importpath = "github.com/kujilabo/bamboo/bamboo-worker1/src",
+    importpath = "github.com/kujilabo/bamboo/bamboo-worker-redis-redis/src",
     visibility = ["//visibility:private"],
     deps = [
         "//bamboo-lib/worker",
         "//bamboo-worker1/src/config",
         "//lib/config",
-        "//lib/worker",
         "@com_github_redis_go_redis_v9//:go-redis",
         "@com_github_segmentio_kafka_go//:kafka-go",
         "@com_github_sirupsen_logrus//:logrus",

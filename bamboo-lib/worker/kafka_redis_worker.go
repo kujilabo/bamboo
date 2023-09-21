@@ -14,88 +14,87 @@ import (
 
 	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
+	libworker "github.com/kujilabo/bamboo/lib/worker"
 )
 
 type kafkaRedisBambooWorker struct {
-	kafkaReaderConfig kafka.ReaderConfig
-	redisOptions      redis.UniversalOptions
-	workerFn          WorkerFn
+	consumerOptions  kafka.ReaderConfig
+	publisherOptions redis.UniversalOptions
+	workerFn         WorkerFn
 }
 
-func NewKafkaRedisBambooWorker(kafkaReaderConfig kafka.ReaderConfig, redisOptions redis.UniversalOptions, workerFn WorkerFn) BambooWorker {
+type job struct {
+	publisherOptions redis.UniversalOptions
+	workerFn         WorkerFn
+	parameter        []byte
+	resultChannel    string
+}
+
+func (j *job) Run(ctx context.Context) error {
+	result, err := j.workerFn(ctx, j.parameter)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("xxx")
+
+	publisher := redis.NewUniversalClient(&j.publisherOptions)
+	defer publisher.Close()
+
+	if _, err := publisher.Publish(ctx, j.resultChannel, result).Result(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func NewKafkaRedisBambooWorker(consumerOptions kafka.ReaderConfig, publisherOptions redis.UniversalOptions, workerFn WorkerFn) BambooWorker {
+
 	return &kafkaRedisBambooWorker{
-		kafkaReaderConfig: kafkaReaderConfig,
-		redisOptions:      redisOptions,
-		workerFn:          workerFn,
+		consumerOptions:  consumerOptions,
+		publisherOptions: publisherOptions,
+		workerFn:         workerFn,
 	}
 }
 
+func (w *kafkaRedisBambooWorker) ping(ctx context.Context) error {
+	if len(w.consumerOptions.Brokers) == 0 {
+		return errors.New("broker size is 0")
+	}
+
+	conn, err := kafka.Dial("tcp", w.consumerOptions.Brokers[0])
+	if err != nil {
+		return liberrors.Errorf("kafka.Dial. err: %w", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.ReadPartitions(); err != nil {
+		return liberrors.Errorf("conn.ReadPartitions. err: %w", err)
+	}
+
+	publisher := redis.NewUniversalClient(&w.publisherOptions)
+	defer publisher.Close()
+	if result := publisher.Ping(ctx); result.Err() != nil {
+		return result.Err()
+	}
+
+	return nil
+}
+
 func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
-	// for {
-	// 	m, err := r.ReadMessage(ctx)
-	// 	if err != nil {
-	// 		if err := r.Close(); err != nil {
-	// 			log.Fatal("failed to close reader:", err)
-	// 			return err
-	// 		}
-	// 	}
-
-	// 	fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
-
-	// 	req := bamboorequest.ApplicationRequest{}
-	// 	if err := json.Unmarshal(m.Value, &req); err != nil {
-	// 		return err
-	// 	}
-
-	// 	resData, err := w.workerFn(ctx, req.Data)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	fmt.Println("xxx")
-
-	// 	rdb := redis.NewUniversalClient(&w.redisOptions)
-	// 	defer rdb.Close()
-
-	// 	result := rdb.Publish(ctx, req.ResultChannel, resData)
-	// 	if result.Err() != nil {
-	// 		return result.Err()
-	// 	}
-	// }
 
 	operation := func() error {
-		if err := func() error {
-			if len(w.kafkaReaderConfig.Brokers) == 0 {
-				return errors.New("broker size is 0")
-			}
-
-			conn, err := kafka.Dial("tcp", w.kafkaReaderConfig.Brokers[0])
-			if err != nil {
-				return liberrors.Errorf("kafka.Dial. err: %w", err)
-			}
-			defer conn.Close()
-
-			if _, err := conn.ReadPartitions(); err != nil {
-				return liberrors.Errorf("conn.ReadPartitions. err: %w", err)
-			}
-			return nil
-		}(); err != nil {
+		if err := w.ping(ctx); err != nil {
 			return err
 		}
 
-		if err := func() error {
-			rdb := redis.NewUniversalClient(&w.redisOptions)
-			defer rdb.Close()
-			if result := rdb.Ping(ctx); result.Err() != nil {
-				return result.Err()
-			}
-			return nil
-		}(); err != nil {
-			return err
-		}
+		dispatcher := libworker.NewDispatcher()
+		defer dispatcher.Stop(ctx)
+		dispatcher.Start(ctx, 5)
 
-		r := kafka.NewReader(w.kafkaReaderConfig)
+		r := kafka.NewReader(w.consumerOptions)
 		defer r.Close()
+
 		fmt.Println("START")
 		for {
 			m, err := r.ReadMessage(ctx)
@@ -117,22 +116,12 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 				return err
 			}
 
-			resData, err := w.workerFn(ctx, req.Data)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println("xxx")
-
-			rdb := redis.NewUniversalClient(&w.redisOptions)
-			defer rdb.Close()
-
-			result := rdb.Publish(ctx, req.ResultChannel, resData)
-			if result.Err() != nil {
-				return result.Err()
-			}
-
-			return errors.New("aaa")
+			dispatcher.AddJob(ctx, &job{
+				publisherOptions: w.publisherOptions,
+				workerFn:         w.workerFn,
+				parameter:        req.Data,
+				resultChannel:    req.ResultChannel,
+			})
 		}
 	}
 

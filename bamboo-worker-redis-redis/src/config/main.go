@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -21,7 +20,6 @@ import (
 	bambooworker "github.com/kujilabo/bamboo/bamboo-lib/worker"
 	"github.com/kujilabo/bamboo/bamboo-worker1/src/config"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
-	"github.com/kujilabo/bamboo/lib/worker"
 )
 
 func getValue(values ...string) string {
@@ -33,36 +31,13 @@ func getValue(values ...string) string {
 	return ""
 }
 
-type SleepJob struct {
-	wg *sync.WaitGroup
-}
-
-func (j *SleepJob) Run(ctx context.Context) error {
-	time.Sleep(time.Second * 5)
-	j.wg.Done()
-	return nil
-}
-
 func main() {
-	ctx := context.Background()
-	dispatcher := worker.NewDispatcher()
-	dispatcher.Start(ctx, 5)
-	wg := sync.WaitGroup{}
-
-	wg.Add(5)
-	for i := 0; i < 5; i++ {
-		dispatcher.JobQueue <- &SleepJob{&wg}
-	}
-	wg.Wait()
-}
-
-func main1() {
 	ctx := context.Background()
 	mode := flag.String("mode", "", "")
 	flag.Parse()
 	appMode := getValue(*mode, os.Getenv("APP_MODE"), "debug")
 	logrus.Infof("mode: %s", appMode)
-	fmt.Println("bamboo-worker1")
+	fmt.Println("bamboo-worker-redis-redis")
 
 	cfg, tp := initialize(ctx, appMode)
 	defer tp.ForceFlush(ctx) // flushes any pending spans
