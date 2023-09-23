@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
-	bambooresult "github.com/kujilabo/bamboo/bamboo-lib/result"
+
+	"github.com/kujilabo/bamboo/bamboo-lib/request"
+	"github.com/kujilabo/bamboo/bamboo-lib/result"
 )
 
 type BambooPrameter interface {
@@ -23,11 +24,11 @@ type WorkerClient interface {
 }
 
 type workerClient struct {
-	rp bamboorequest.BambooRequestProducer
-	rs bambooresult.BambooResultSubscriber
+	rp request.BambooRequestProducer
+	rs result.BambooResultSubscriber
 }
 
-func NewWorkerClient(rp bamboorequest.BambooRequestProducer, rs bambooresult.BambooResultSubscriber) WorkerClient {
+func NewWorkerClient(rp request.BambooRequestProducer, rs result.BambooResultSubscriber) WorkerClient {
 	return &workerClient{
 		rp: rp,
 		rs: rs,
@@ -74,21 +75,21 @@ func (c *StandardClient) Call(ctx context.Context, traceID, clientName string, p
 		return nil, errors.New("NotFound" + clientName)
 	}
 
-	ch := make(chan bambooresult.ByteArreayResult)
+	ch := make(chan result.ByteArreayResult)
 	go func() {
-		result, err := client.SubscribeString(ctx, redisChannel, timeout)
+		resultStr, err := client.SubscribeString(ctx, redisChannel, timeout)
 		if err != nil {
-			ch <- bambooresult.ByteArreayResult{Value: nil, Error: err}
+			ch <- result.ByteArreayResult{Value: nil, Error: err}
 			return
 		}
 
-		decoded, err := base64.StdEncoding.DecodeString(result)
+		resultBytes, err := base64.StdEncoding.DecodeString(resultStr)
 		if err != nil {
-			ch <- bambooresult.ByteArreayResult{Value: nil, Error: err}
+			ch <- result.ByteArreayResult{Value: nil, Error: err}
 			return
 		}
 
-		ch <- bambooresult.ByteArreayResult{Value: decoded, Error: nil}
+		ch <- result.ByteArreayResult{Value: resultBytes, Error: nil}
 	}()
 
 	if err := client.Produce(ctx, traceID, redisChannel, param); err != nil {
