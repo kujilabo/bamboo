@@ -71,7 +71,7 @@ func (e *expr) worker1(ctx context.Context, x, y int) int {
 		return 0
 	}
 
-	respBytes, err := e.app.Call(ctx, "def", "worker1", paramBytes, time.Second*10)
+	respBytes, err := e.app.Call(ctx, "worker1", paramBytes, time.Second*10)
 	if err != nil {
 		logger.Info("%+v", err)
 		e.setError(err)
@@ -100,7 +100,7 @@ func (e *expr) workerRedisRedis(ctx context.Context, x, y int) int {
 		return 0
 	}
 
-	respBytes, err := e.app.Call(ctx, "def", "worker-redis-redis", paramBytes, time.Second*10)
+	respBytes, err := e.app.Call(ctx, "worker-redis-redis", paramBytes, time.Second*10)
 	if err != nil {
 		e.setError(err)
 		return 0
@@ -149,6 +149,7 @@ func main() {
 			}
 
 			logCtx := log.With(spanCtx, log.Str("request_id", requestID.String()))
+			logCtx = context.WithValue(logCtx, "request_id", requestID.String())
 			logger := log.FromContext(logCtx)
 			logger.Info("Start")
 

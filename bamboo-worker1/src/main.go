@@ -42,7 +42,7 @@ type SleepJob struct {
 	wg *sync.WaitGroup
 }
 
-func (j *SleepJob) Run() error {
+func (j *SleepJob) Run(ctx context.Context) error {
 	time.Sleep(time.Second * 5)
 	j.wg.Done()
 	return nil

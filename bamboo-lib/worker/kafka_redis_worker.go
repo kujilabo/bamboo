@@ -53,8 +53,8 @@ func (w *kafkaRedisBambooWorker) ping(ctx context.Context) error {
 
 	publisher := redis.NewUniversalClient(&w.publisherOptions)
 	defer publisher.Close()
-	if result := publisher.Ping(ctx); result.Err() != nil {
-		return result.Err()
+	if _, err := publisher.Ping(ctx).Result(); err != nil {
+		liberrors.Errorf("publisher.Ping. err: %w", err)
 	}
 
 	return nil
@@ -92,18 +92,8 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 				logger.Warnf("invalid parameter. failed to proto.Unmarshal. err: %w", err)
 				continue
 			}
-			// jobCtx := context.Background()
+
 			var headers propagation.MapCarrier = req.Headers
-			// w.propagator.Extract(ctx, headers)
-
-			// logger.Infof("carrier: %+v", headers)
-			// ctx = w.propagator.Extract(ctx, headers)
-			// go func() {
-			// 	_, span := tracer.Start(ctx, "consume message")
-			// 	defer span.End()
-			// 	time.Sleep(time.Second)
-			// }()
-
 			dispatcher.AddJob(NewRedisJob(ctx, headers, req.RequestId, w.publisherOptions, w.workerFn, req.Data, req.ResultChannel))
 		}
 	}

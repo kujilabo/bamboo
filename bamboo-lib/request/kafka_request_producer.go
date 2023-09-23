@@ -32,7 +32,7 @@ func NewKafkaBambooRequestProducer(ctx context.Context, workerName, addr, topic 
 	}
 }
 
-func (p *kafkaBambooRequestProducer) Produce(ctx context.Context, traceID, resultChannel string, data []byte) error {
+func (p *kafkaBambooRequestProducer) Produce(ctx context.Context, resultChannel string, data []byte) error {
 	logger := log.FromContext(ctx)
 	propagator := otel.GetTextMapPropagator()
 	headers := propagation.MapCarrier{}
@@ -47,6 +47,7 @@ func (p *kafkaBambooRequestProducer) Produce(ctx context.Context, traceID, resul
 		requestID = ""
 	}
 
+	logger.Infof("REQID:%s", requestID)
 	messageID, err := uuid.NewRandom()
 	if err != nil {
 		return liberrors.Errorf("uuid.NewRandom. err: %w", err)

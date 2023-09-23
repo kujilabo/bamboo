@@ -28,7 +28,7 @@ func NewRedisBambooRequestProducer(ctx context.Context, workerName string, produ
 	}
 }
 
-func (p *redisBambooRequestProducer) Produce(ctx context.Context, traceID, resultChannel string, data []byte) error {
+func (p *redisBambooRequestProducer) Produce(ctx context.Context, resultChannel string, data []byte) error {
 	logger := log.FromContext(ctx)
 	propagator := otel.GetTextMapPropagator()
 	headers := propagation.MapCarrier{}

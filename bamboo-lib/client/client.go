@@ -16,8 +16,8 @@ type BambooPrameter interface {
 }
 
 type WorkerClient interface {
-	Produce(ctx context.Context, traceID, redisChannel string, data []byte) error
-	Subscribe(ctx context.Context, redisChannel string, timeout time.Duration) ([]byte, error)
+	Produce(ctx context.Context, resultChannel string, data []byte) error
+	Subscribe(ctx context.Context, resultChannel string, timeout time.Duration) ([]byte, error)
 	Ping(ctx context.Context) error
 	Close(ctx context.Context)
 }
@@ -34,8 +34,8 @@ func NewWorkerClient(rp request.BambooRequestProducer, rs result.BambooResultSub
 	}
 }
 
-func (c *workerClient) Produce(ctx context.Context, traceID, redisChannel string, data []byte) error {
-	return c.rp.Produce(ctx, traceID, redisChannel, data)
+func (c *workerClient) Produce(ctx context.Context, resultChannel string, data []byte) error {
+	return c.rp.Produce(ctx, resultChannel, data)
 }
 
 func (c *workerClient) Subscribe(ctx context.Context, redisChannel string, timeout time.Duration) ([]byte, error) {
@@ -63,7 +63,7 @@ func (c *StandardClient) newRedisChannelString() (string, error) {
 	return redisChannel.String(), nil
 }
 
-func (c *StandardClient) Call(ctx context.Context, traceID, clientName string, param []byte, timeout time.Duration) ([]byte, error) {
+func (c *StandardClient) Call(ctx context.Context, clientName string, param []byte, timeout time.Duration) ([]byte, error) {
 	redisChannel, err := c.newRedisChannelString()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (c *StandardClient) Call(ctx context.Context, traceID, clientName string, p
 		ch <- result.ByteArreayResult{Value: resultBytes, Error: nil}
 	}()
 
-	if err := client.Produce(ctx, traceID, redisChannel, param); err != nil {
+	if err := client.Produce(ctx, redisChannel, param); err != nil {
 		return nil, err
 	}
 
