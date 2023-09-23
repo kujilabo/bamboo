@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -11,16 +10,21 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/kujilabo/bamboo/bamboo-app1/src/config"
+	"github.com/kujilabo/bamboo/bamboo-lib/client"
 	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
 	bambooresult "github.com/kujilabo/bamboo/bamboo-lib/result"
+	worker_redis_redis_pb "github.com/kujilabo/bamboo/bamboo-worker-redis-redis/src/proto"
+	worker1_pb "github.com/kujilabo/bamboo/bamboo-worker1/src/proto"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
+	"github.com/kujilabo/bamboo/lib/log"
 )
 
 func getValue(values ...string) string {
@@ -32,9 +36,13 @@ func getValue(values ...string) string {
 	return ""
 }
 
+type worker struct {
+	rp bamboorequest.BambooRequestProducer
+	rs bambooresult.BambooResultSubscriber
+}
+
 type app struct {
-	rs    bambooresult.BambooResultSubscriber
-	rpMap map[string]bamboorequest.BambooRequestProducer
+	workers map[string]worker
 }
 
 func (a *app) newRedisChannelString() (string, error) {
@@ -44,10 +52,6 @@ func (a *app) newRedisChannelString() (string, error) {
 	}
 
 	return redisChannel.String(), nil
-}
-
-type BambooPrameter interface {
-	ToBytes() ([]byte, error)
 }
 
 type worker1Parameter struct {
@@ -61,51 +65,63 @@ func (p *worker1Parameter) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 	return dataBytes, nil
-
 }
 
-func (a *app) call(ctx context.Context, callee string, param BambooPrameter, timeout time.Duration) (int, error) {
-	redisChannel, err := a.newRedisChannelString()
-	if err != nil {
-		return 0, err
-	}
-
-	rp, ok := a.rpMap[callee]
-	if !ok {
-		return 0, errors.New("NotFound")
-	}
-
-	ch := make(chan bambooresult.StringResult)
-	go func() {
-		result, err := a.rs.SubscribeString(ctx, redisChannel, timeout)
-
-		ch <- bambooresult.StringResult{Value: result, Error: err}
-	}()
-
-	dataBytes, err := param.ToBytes()
-	if err != nil {
-		return 0, err
-	}
-
-	rp.Send(ctx, "def", redisChannel, dataBytes)
-
-	result := <-ch
-	if result.Error != nil {
-		return 0, result.Error
-	}
-	resultMap := map[string]int{}
-	if err := json.Unmarshal([]byte(result.Value), &resultMap); err != nil {
-		return 0, err
-	}
-	value, ok := resultMap["value"]
-	if !ok {
-		return 0, errors.New("ValueNOtFound")
-	}
-	return value, nil
+type workerRedisRedisParameter struct {
+	x int
+	y int
 }
+
+func (p *workerRedisRedisParameter) ToBytes() ([]byte, error) {
+	dataBytes, err := json.Marshal(map[string]int{"x": p.x, "y": p.y})
+	if err != nil {
+		return nil, err
+	}
+	return dataBytes, nil
+}
+
+// func (a *app) call(ctx context.Context, callee string, param BambooPrameter, timeout time.Duration) (int, error) {
+// 	redisChannel, err := a.newRedisChannelString()
+// 	if err != nil {
+// 		return 0, err
+// 	}
+
+// 	worker, ok := a.workers[callee]
+// 	if !ok {
+// 		return 0, errors.New("NotFound" + callee)
+// 	}
+
+// 	ch := make(chan bambooresult.StringResult)
+// 	go func() {
+// 		result, err := worker.rs.SubscribeString(ctx, redisChannel, timeout)
+
+// 		ch <- bambooresult.StringResult{Value: result, Error: err}
+// 	}()
+
+// 	dataBytes, err := param.ToBytes()
+// 	if err != nil {
+// 		return 0, err
+// 	}
+
+// 	worker.rp.Send(ctx, "def", redisChannel, dataBytes)
+
+// 	result := <-ch
+// 	if result.Error != nil {
+// 		return 0, result.Error
+// 	}
+// 	resultMap := map[string]int{}
+// 	if err := json.Unmarshal([]byte(result.Value), &resultMap); err != nil {
+// 		return 0, err
+// 	}
+// 	value, ok := resultMap["value"]
+// 	if !ok {
+// 		return 0, errors.New("ValueNOtFound")
+// 	}
+// 	return value, nil
+// }
 
 type expr struct {
-	app *app
+	app *client.StandardClient
 	err error
 	mu  sync.Mutex
 }
@@ -126,18 +142,63 @@ func (e *expr) setError(err error) {
 }
 
 func (e *expr) worker1(ctx context.Context, x, y int) int {
+	logger := log.FromContext(ctx)
+	if err := e.getError(); err != nil {
+		logger.Info("%+v", err)
+		return 0
+	}
+
+	p1 := worker1_pb.Worker1Parameter{X: int32(x), Y: int32(y)}
+	paramBytes, err := proto.Marshal(&p1)
+	if err != nil {
+		logger.Info("%+v", err)
+
+		e.setError(err)
+		return 0
+	}
+
+	respBytes, err := e.app.Call(ctx, "def", "worker1", paramBytes, time.Second*10)
+	if err != nil {
+		logger.Info("%+v", err)
+		e.setError(err)
+		return 0
+	}
+
+	resp := worker1_pb.Worker1Response{}
+	if err := proto.Unmarshal(respBytes, &resp); err != nil {
+		logger.Info("%+v", err)
+		e.setError(err)
+		return 0
+	}
+
+	return int(resp.Value)
+}
+
+func (e *expr) workerRedisRedis(ctx context.Context, x, y int) int {
 	if err := e.getError(); err != nil {
 		return 0
 	}
 
-	val, err := e.app.call(ctx, "worker1", &worker1Parameter{
-		x: x, y: y,
-	}, time.Second*10)
+	p1 := worker_redis_redis_pb.RedisRedisParameter{X: int32(x), Y: int32(y)}
+	paramBytes, err := proto.Marshal(&p1)
 	if err != nil {
 		e.setError(err)
 		return 0
 	}
-	return val
+
+	respBytes, err := e.app.Call(ctx, "def", "worker-redis-redis", paramBytes, time.Second*10)
+	if err != nil {
+		e.setError(err)
+		return 0
+	}
+
+	resp := worker_redis_redis_pb.RedisRedisResponse{}
+	if err := proto.Unmarshal(respBytes, &resp); err != nil {
+		e.setError(err)
+		return 0
+	}
+
+	return int(resp.Value)
 }
 
 func main() {
@@ -151,37 +212,50 @@ func main() {
 	cfg, tp := initialize(ctx, appMode)
 	defer tp.ForceFlush(ctx) // flushes any pending spans
 
-	rp := bamboorequest.NewKafkaBambooRequestProducer(cfg.RequestProducer.Kafka.Addr, "topic1")
-	defer rp.Close(ctx)
+	clients := map[string]client.WorkerClient{}
+	for k, v := range cfg.Workers {
+		clients[k] = client.CreateWorkerClient(ctx, v)
+		defer clients[k].Close(ctx)
+	}
 
-	rs := bambooresult.NewRedisResultSubscriber(ctx, &redis.UniversalOptions{
-		Addrs:    cfg.ResultSubscriber.Redis.Addrs,
-		Password: cfg.ResultSubscriber.Redis.Password,
-	})
-	if err := rs.Ping(ctx); err != nil {
-		panic(err)
-	}
-	app := app{
-		rs: rs,
-		rpMap: map[string]bamboorequest.BambooRequestProducer{
-			"worker1": rp,
-		},
-	}
+	app := client.StandardClient{Clients: clients}
 
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			// requestID, err := uuid.NewRandom()
+			// if err != nil {
+			// 	panic(err)
+			// }
+
+			spanCtx, span := tracer.Start(ctx, "TraceLog")
+			defer span.End()
+			sc := trace.SpanFromContext(spanCtx).SpanContext()
+			if !sc.TraceID().IsValid() || !sc.SpanID().IsValid() {
+				return
+			}
+
+			logCtx := log.With(ctx, log.Str("trace_id", sc.TraceID().String()))
+			logger := log.FromContext(logCtx)
+			logger.Info("Start")
+
 			e := expr{
 				app: &app,
 			}
-			c := e.worker1(ctx, 3, 5)
-			d := e.worker1(ctx, c, 3)
-			f := e.worker1(ctx, d, 2)
 
+			c := e.worker1(spanCtx, 3, 5)
+			d := e.worker1(spanCtx, c, 3)
+			f := e.worker1(spanCtx, d, 2)
+			g := e.workerRedisRedis(spanCtx, f, 9)
+
+			fmt.Println(c)
+			fmt.Println(d)
 			fmt.Println(f)
+			fmt.Println(g)
 			fmt.Println(e.err)
 		}()
 	}

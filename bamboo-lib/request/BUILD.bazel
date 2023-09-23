@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "request",
     srcs = [
+        "config.go",
         "kafka_request_producer.go",
         "redis_request_producer.go",
         "request.go",
@@ -12,8 +13,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//lib/errors",
+        "//lib/log",
         "@com_github_google_uuid//:uuid",
         "@com_github_redis_go_redis_v9//:go-redis",
         "@com_github_segmentio_kafka_go//:kafka-go",
+        "@org_golang_google_protobuf//proto",
     ],
 )

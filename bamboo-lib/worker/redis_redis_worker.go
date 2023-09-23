@@ -11,6 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
+	liberrors "github.com/kujilabo/bamboo/lib/errors"
+	libworker "github.com/kujilabo/bamboo/lib/worker"
 )
 
 type redisRedisBambooWorker struct {
@@ -18,14 +20,16 @@ type redisRedisBambooWorker struct {
 	consumerChannel  string
 	publisherOptions redis.UniversalOptions
 	workerFn         WorkerFn
+	numWorkers       int
 }
 
-func NewRedisRedisBambooWorker(consumerOptions redis.UniversalOptions, consumerChannel string, publisherOptions redis.UniversalOptions, workerFn WorkerFn) BambooWorker {
+func NewRedisRedisBambooWorker(consumerOptions redis.UniversalOptions, consumerChannel string, publisherOptions redis.UniversalOptions, workerFn WorkerFn, numWorkers int) BambooWorker {
 	return &redisRedisBambooWorker{
 		consumerOptions:  consumerOptions,
 		consumerChannel:  consumerChannel,
 		publisherOptions: publisherOptions,
 		workerFn:         workerFn,
+		numWorkers:       numWorkers,
 	}
 }
 
@@ -48,8 +52,12 @@ func (w *redisRedisBambooWorker) ping(ctx context.Context) error {
 func (w *redisRedisBambooWorker) Run(ctx context.Context) error {
 	operation := func() error {
 		if err := w.ping(ctx); err != nil {
-			return err
+			return liberrors.Errorf("ping. err: %w", err)
 		}
+
+		dispatcher := libworker.NewDispatcher()
+		defer dispatcher.Stop(ctx)
+		dispatcher.Start(ctx, w.numWorkers)
 
 		consumer := redis.NewUniversalClient(&w.publisherOptions)
 		defer consumer.Close()
@@ -61,33 +69,41 @@ func (w *redisRedisBambooWorker) Run(ctx context.Context) error {
 				return err
 			}
 
-			if len(m) == 1 {
+			if len(m) != 2 {
 				return errors.New("Conn error")
 			}
 
 			req := bamboorequest.ApplicationRequest{}
-			if err := json.Unmarshal([]byte(m[0]), &req); err != nil {
+			if err := json.Unmarshal([]byte(m[1]), &req); err != nil {
 				return err
 			}
 
-			resData, err := w.workerFn(ctx, req.Data)
-			if err != nil {
-				return err
-			}
+			dispatcher.AddJob(ctx, &redisJob{
+				publisherOptions: w.publisherOptions,
+				workerFn:         w.workerFn,
+				parameter:        req.Data,
+				resultChannel:    req.ResultChannel,
+			})
 
-			fmt.Println("xxx")
+			// resData, err := w.workerFn(ctx, req.Data)
+			// if err != nil {
+			// 	return err
+			// }
 
-			publisher := redis.NewUniversalClient(&w.publisherOptions)
-			defer publisher.Close()
+			// fmt.Println("xxx")
 
-			if _, err := publisher.Publish(ctx, req.ResultChannel, resData).Result(); err != nil {
-				return err
-			}
+			// publisher := redis.NewUniversalClient(&w.publisherOptions)
+			// defer publisher.Close()
+
+			// if _, err := publisher.Publish(ctx, req.ResultChannel, resData).Result(); err != nil {
+			// 	return err
+			// }
 		}
 	}
 
-	// backOff := backoff.WithContext(r.newBackOff(), req.Context())
-	backOff := &backoff.ZeroBackOff{}
+	// backOff := backoff.WithContext(newBackOff(), ctx)
+	// backOff := &backoff.ZeroBackOff{}
+	backOff := backoff.NewExponentialBackOff()
 
 	notify := func(err error, d time.Duration) {
 		// logger.Debug().Msgf("New attempt %d for request: %v", attempts, req.URL)
@@ -106,12 +122,12 @@ func (w *redisRedisBambooWorker) Run(ctx context.Context) error {
 }
 
 // func newBackOff() backoff.BackOff {
-// 	if r.attempts < 2 || r.initialInterval <= 0 {
-// 		return &backoff.ZeroBackOff{}
-// 	}
+// 	// if r.attempts < 2 || r.initialInterval <= 0 {
+// 	// 	return &backoff.ZeroBackOff{}
+// 	// }
 
 // 	b := backoff.NewExponentialBackOff()
-// 	b.InitialInterval = r.initialInterval
+// 	b.InitialInterval = time.Second * 5
 
 // 	// calculate the multiplier for the given number of attempts
 // 	// so that applying the multiplier for the given number of attempts will not exceed 2 times the initial interval

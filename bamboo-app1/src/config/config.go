@@ -8,33 +8,15 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/kujilabo/bamboo/bamboo-lib/client"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
-	libD "github.com/kujilabo/bamboo/lib/domain"
+	libdomain "github.com/kujilabo/bamboo/lib/domain"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
 )
 
 type AppConfig struct {
 	Name        string `yaml:"name" validate:"required"`
 	MetricsPort int    `yaml:"metricsPort" validate:"required"`
-}
-
-type RequestProducerConfig struct {
-	Type  string                      `yaml:"type" validate:"required"`
-	Kafka *KafkaRequestProducerConfig `yaml:"kafka"`
-}
-
-type KafkaRequestProducerConfig struct {
-	Addr string `yaml:"addr" validate:"required"`
-}
-
-type RedisResultSubscriberConfig struct {
-	Addrs    []string `yaml:"addrs" validate:"required"`
-	Password string   `yaml:"password"`
-}
-
-type ResultSubscriberConfig struct {
-	Type  string                       `yaml:"type" validate:"required"`
-	Redis *RedisResultSubscriberConfig `yaml:"redis"`
 }
 
 type ShutdownConfig struct {
@@ -48,14 +30,13 @@ type DebugConfig struct {
 }
 
 type Config struct {
-	App              *AppConfig               `yaml:"app" validate:"required"`
-	RequestProducer  *RequestProducerConfig   `yaml:"requestProducer" validate:"required"`
-	ResultSubscriber *ResultSubscriberConfig  `yaml:"resultSubscriber" validate:"required"`
-	Trace            *libconfig.TraceConfig   `yaml:"trace" validate:"required"`
-	Shutdown         *ShutdownConfig          `yaml:"shutdown" validate:"required"`
-	Log              *libconfig.LogConfig     `yaml:"log" validate:"required"`
-	Swagger          *libconfig.SwaggerConfig `yaml:"swagger" validate:"required"`
-	Debug            *DebugConfig             `yaml:"debug"`
+	App      *AppConfig                            `yaml:"app" validate:"required"`
+	Workers  map[string]*client.WorkerClientConfig `yaml:"workers" validate:"required"`
+	Trace    *libconfig.TraceConfig                `yaml:"trace" validate:"required"`
+	Shutdown *ShutdownConfig                       `yaml:"shutdown" validate:"required"`
+	Log      *libconfig.LogConfig                  `yaml:"log" validate:"required"`
+	Swagger  *libconfig.SwaggerConfig              `yaml:"swagger" validate:"required"`
+	Debug    *DebugConfig                          `yaml:"debug"`
 }
 
 // //go:embed production.yml
@@ -76,7 +57,7 @@ func LoadConfig(env string) (*Config, error) {
 		return nil, liberrors.Errorf("yaml.Unmarshal. filename: %s, err: %w", filename, err)
 	}
 
-	if err := libD.Validator.Struct(conf); err != nil {
+	if err := libdomain.Validator.Struct(conf); err != nil {
 		return nil, liberrors.Errorf("Validator.Structl. filename: %s, err: %w", filename, err)
 	}
 

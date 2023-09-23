@@ -7,14 +7,14 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//bamboo-lib/worker",
-        "//bamboo-worker1/src/config",
+        "//bamboo-worker-redis-redis/src/config",
+        "//bamboo-worker-redis-redis/src/proto",
         "//lib/config",
-        "@com_github_redis_go_redis_v9//:go-redis",
-        "@com_github_segmentio_kafka_go//:kafka-go",
         "@com_github_sirupsen_logrus//:logrus",
         "@io_opentelemetry_go_otel//:otel",
         "@io_opentelemetry_go_otel//propagation",
         "@io_opentelemetry_go_otel_sdk//trace",
+        "@org_golang_google_protobuf//proto",
         "@org_golang_x_sync//errgroup",
     ],
 )

@@ -4,15 +4,19 @@ app:
   name: bamboo-worker-redis-redis
   metricsPort: 8081
 worker:
-  kafka:
-    brokers:
-      - localhost:29092
-    groupId: worker-redis-redis
-    topic: redis-redis
-  redis:
-    addrs:
-      - "localhost:6379"
-    password:
+  consumer:
+    type: redis
+    redis:
+      addrs:
+        - "localhost:6379"
+      channel: redis-redis
+  publisher:
+    type: redis
+    redis:
+      addrs:
+        - "localhost:6379"
+      password:
+  numWorkers: 5
 trace:
   exporter: jaeger
   jaeger:

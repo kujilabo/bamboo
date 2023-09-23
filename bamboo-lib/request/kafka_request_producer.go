@@ -2,12 +2,15 @@ package request
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
 
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
+	"google.golang.org/protobuf/proto"
 
+	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
+	"github.com/kujilabo/bamboo/lib/log"
 )
 
 type kafkaBambooRequestProducer struct {
@@ -26,7 +29,9 @@ func NewKafkaBambooRequestProducer(addr, topic string) BambooRequestProducer {
 	}
 }
 
-func (p *kafkaBambooRequestProducer) Send(ctx context.Context, traceID, resultChannel string, data []byte) error {
+func (p *kafkaBambooRequestProducer) Produce(ctx context.Context, traceID, resultChannel string, data []byte) error {
+	logger := log.FromContext(ctx)
+
 	requestID, err := uuid.NewRandom()
 	if err != nil {
 		return liberrors.Errorf("uuid.NewRandom. err: %w", err)
@@ -37,17 +42,29 @@ func (p *kafkaBambooRequestProducer) Send(ctx context.Context, traceID, resultCh
 	// 	return err
 	// }
 
-	req := ApplicationRequest{
-		RequestID:     requestID.String(),
-		TraceID:       traceID,
+	// req := ApplicationRequest{
+	// 	RequestID:     requestID.String(),
+	// 	TraceID:       traceID,
+	// 	ResultChannel: resultChannel,
+	// 	Data:          data,
+	// }
+	req := pb.WorkerParameter{
+		RequestId:     requestID.String(),
+		TraceId:       traceID,
 		ResultChannel: resultChannel,
 		Data:          data,
 	}
-
-	reqBytes, err := json.Marshal(req)
+	reqBytes, err := proto.Marshal(&req)
 	if err != nil {
-		return liberrors.Errorf("json.Marshal. err: %w", err)
+		return liberrors.Errorf("proto.Marshal. err: %w", err)
 	}
+	reqStr := base64.StdEncoding.EncodeToString(reqBytes)
+
+	// reqBytes, err := json.Marshal(req)
+	// if err != nil {
+	// 	return liberrors.Errorf("json.Marshal. err: %w", err)
+	// }
+	logger.Infof("SEND %s", reqStr)
 
 	if err := p.writer.WriteMessages(context.Background(),
 		kafka.Message{
@@ -55,7 +72,7 @@ func (p *kafkaBambooRequestProducer) Send(ctx context.Context, traceID, resultCh
 			Value: reqBytes,
 		},
 	); err != nil {
-		return liberrors.Errorf("write. err: %w", err)
+		return liberrors.Errorf("WriteMessages. err: %w", err)
 	}
 
 	return nil

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,10 +16,13 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 
 	bambooworker "github.com/kujilabo/bamboo/bamboo-lib/worker"
 	"github.com/kujilabo/bamboo/bamboo-worker1/src/config"
+	pb "github.com/kujilabo/bamboo/bamboo-worker1/src/proto"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
+	"github.com/kujilabo/bamboo/lib/log"
 	"github.com/kujilabo/bamboo/lib/worker"
 )
 
@@ -43,7 +45,7 @@ func (j *SleepJob) Run(ctx context.Context) error {
 	return nil
 }
 
-func main() {
+func main0() {
 	ctx := context.Background()
 	dispatcher := worker.NewDispatcher()
 	dispatcher.Start(ctx, 5)
@@ -56,7 +58,7 @@ func main() {
 	wg.Wait()
 }
 
-func main1() {
+func main() {
 	ctx := context.Background()
 	mode := flag.String("mode", "", "")
 	flag.Parse()
@@ -79,7 +81,7 @@ func main1() {
 	}, redis.UniversalOptions{
 		Addrs:    cfg.Worker.Redis.Addrs,
 		Password: cfg.Worker.Redis.Password,
-	}, workerFn)
+	}, workerFn, 5)
 
 	result := run(ctx, cfg, worker)
 
@@ -130,20 +132,31 @@ func initialize(ctx context.Context, mode string) (*config.Config, *sdktrace.Tra
 }
 
 func workerFn(ctx context.Context, reqBytes []byte) ([]byte, error) {
-	data := map[string]int{}
-	if err := json.Unmarshal([]byte(reqBytes), &data); err != nil {
+	logger := log.FromContext(ctx)
+
+	req := pb.Worker1Parameter{}
+	if err := proto.Unmarshal(reqBytes, &req); err != nil {
+		logger.Info("%+v", err)
 		return nil, errors.New("adddd")
 	}
 
-	answer := data["x"] * data["y"]
+	// data := map[string]int{}
+	// if err := json.Unmarshal([]byte(reqBytes), &data); err != nil {
+	// 	logger.Errorf("xxxxxxxxxxxxxxxxx " + string(reqBytes))
+	// 	return nil, errors.New("adddd")
+	// }
 
-	res := map[string]int{"value": answer}
-	resJson, err := json.Marshal(res)
+	// answer := data["x"] * data["y"]
+
+	answer := req.X * req.Y
+	resp := pb.Worker1Response{Value: answer}
+	respBytes, err := proto.Marshal(&resp)
 	if err != nil {
+		logger.Errorf("%+v", err)
 		return nil, err
 	}
 
-	return []byte(resJson), nil
+	return respBytes, nil
 }
 
 // func requestReader(ctx context.Context, kafkaReaderConfig kafka.ReaderConfig, fn bambooworker.WorkerFn) error {

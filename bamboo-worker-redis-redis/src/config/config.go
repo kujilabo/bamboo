@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/kujilabo/bamboo/bamboo-lib/worker"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
 	libD "github.com/kujilabo/bamboo/lib/domain"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
@@ -16,22 +17,6 @@ import (
 type AppConfig struct {
 	Name        string `yaml:"name" validate:"required"`
 	MetricsPort int    `yaml:"metricsPort" validate:"required"`
-}
-
-type WorkerConfig struct {
-	Kafka *KafkaWorkerConfig `yaml:"kafka"`
-	Redis *RedisWorkerConfig `yaml:"redis"`
-}
-
-type KafkaWorkerConfig struct {
-	Brokers []string `yaml:"brokers" validate:"required"`
-	GroupID string   `yaml:"groupId" validate:"required"`
-	Topic   string   `yaml:"topic" validate:"required"`
-}
-
-type RedisWorkerConfig struct {
-	Addrs    []string `yaml:"addrs" validate:"required"`
-	Password string   `yaml:"password"`
 }
 
 type ShutdownConfig struct {
@@ -46,7 +31,7 @@ type DebugConfig struct {
 
 type Config struct {
 	App      *AppConfig             `yaml:"app" validate:"required"`
-	Worker   *WorkerConfig          `yaml:"worker" validate:"required"`
+	Worker   *worker.WorkerConfig   `yaml:"worker" validate:"required"`
 	Trace    *libconfig.TraceConfig `yaml:"trace" validate:"required"`
 	Shutdown *ShutdownConfig        `yaml:"shutdown" validate:"required"`
 	Log      *libconfig.LogConfig   `yaml:"log" validate:"required"`

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -14,6 +13,7 @@ import (
 
 	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
+	"github.com/kujilabo/bamboo/lib/log"
 	libworker "github.com/kujilabo/bamboo/lib/worker"
 )
 
@@ -21,39 +21,15 @@ type kafkaRedisBambooWorker struct {
 	consumerOptions  kafka.ReaderConfig
 	publisherOptions redis.UniversalOptions
 	workerFn         WorkerFn
+	numWorkers       int
 }
 
-type job struct {
-	publisherOptions redis.UniversalOptions
-	workerFn         WorkerFn
-	parameter        []byte
-	resultChannel    string
-}
-
-func (j *job) Run(ctx context.Context) error {
-	result, err := j.workerFn(ctx, j.parameter)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("xxx")
-
-	publisher := redis.NewUniversalClient(&j.publisherOptions)
-	defer publisher.Close()
-
-	if _, err := publisher.Publish(ctx, j.resultChannel, result).Result(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func NewKafkaRedisBambooWorker(consumerOptions kafka.ReaderConfig, publisherOptions redis.UniversalOptions, workerFn WorkerFn) BambooWorker {
-
+func NewKafkaRedisBambooWorker(consumerOptions kafka.ReaderConfig, publisherOptions redis.UniversalOptions, workerFn WorkerFn, numWorkers int) BambooWorker {
 	return &kafkaRedisBambooWorker{
 		consumerOptions:  consumerOptions,
 		publisherOptions: publisherOptions,
 		workerFn:         workerFn,
+		numWorkers:       numWorkers,
 	}
 }
 
@@ -82,7 +58,6 @@ func (w *kafkaRedisBambooWorker) ping(ctx context.Context) error {
 }
 
 func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
-
 	operation := func() error {
 		if err := w.ping(ctx); err != nil {
 			return err
@@ -90,7 +65,7 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 
 		dispatcher := libworker.NewDispatcher()
 		defer dispatcher.Stop(ctx)
-		dispatcher.Start(ctx, 5)
+		dispatcher.Start(ctx, w.numWorkers)
 
 		r := kafka.NewReader(w.consumerOptions)
 		defer r.Close()
@@ -100,7 +75,7 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 			m, err := r.ReadMessage(ctx)
 			if err != nil {
 				if err := r.Close(); err != nil {
-					log.Fatal("failed to close reader:", err)
+					// log.Fatal("failed to close reader:", err)
 					return err
 				}
 			}
@@ -115,8 +90,9 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 			if err := json.Unmarshal(m.Value, &req); err != nil {
 				return err
 			}
+			logCtx := log.With(ctx, log.Str("request_id", req.RequestID))
 
-			dispatcher.AddJob(ctx, &job{
+			dispatcher.AddJob(logCtx, &redisJob{
 				publisherOptions: w.publisherOptions,
 				workerFn:         w.workerFn,
 				parameter:        req.Data,
@@ -126,7 +102,9 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 	}
 
 	// backOff := backoff.WithContext(r.newBackOff(), req.Context())
-	backOff := &backoff.ZeroBackOff{}
+	// backOff := &backoff.ZeroBackOff{}
+	backOff := backoff.NewExponentialBackOff()
+	backOff.MaxElapsedTime = 0
 
 	notify := func(err error, d time.Duration) {
 		// logger.Debug().Msgf("New attempt %d for request: %v", attempts, req.URL)

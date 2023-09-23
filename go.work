@@ -1,8 +1,9 @@
-go 1.21.0
+go 1.21.1
 
 use (
 	./bamboo-app1
-	./bamboo-worker1
 	./bamboo-lib
+	./bamboo-worker-redis-redis
+	./bamboo-worker1
 	./lib
 )

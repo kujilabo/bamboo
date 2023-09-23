@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "client",
+    srcs = [
+        "client.go",
+        "client_factory.go",
+        "config.go",
+    ],
+    importpath = "github.com/kujilabo/bamboo/bamboo-lib/client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bamboo-lib/request",
+        "//bamboo-lib/result",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_redis_go_redis_v9//:go-redis",
+    ],
+)

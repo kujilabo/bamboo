@@ -72,11 +72,20 @@ gen-src:
 
 .PHONY: gen-proto
 gen-proto:
-	@pushd ./proto && \
+	@pushd ./bamboo-worker1 && \
 	protoc --go_out=./src/ --go_opt=paths=source_relative \
         --go-grpc_out=./src/ --go-grpc_opt=paths=source_relative \
-        proto/translator_admin.proto \
-		proto/translator_user.proto && \
+        proto/worker1.proto && \
+	popd
+	@pushd ./bamboo-worker-redis-redis && \
+	protoc --go_out=./src/ --go_opt=paths=source_relative \
+        --go-grpc_out=./src/ --go-grpc_opt=paths=source_relative \
+        proto/redis_redis.proto && \
+	popd
+	@pushd ./bamboo-lib && \
+	protoc --go_out=./ --go_opt=paths=source_relative \
+        --go-grpc_out=./ --go-grpc_opt=paths=source_relative \
+        proto/bamboo_lib.proto && \
 	popd
 
 .PHONY: update-mod
@@ -97,7 +106,7 @@ work-init:
 	@go work init
 
 work-use:
-	@go work use bamboo-app1 bamboo-worker1 bamboo-lib lib
+	@go work use bamboo-app1 bamboo-worker1 bamboo-worker-redis-redis bamboo-lib lib
 
 gazelle:
 	# sudo chmod 777 -R docker/development

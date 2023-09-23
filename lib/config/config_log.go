@@ -14,8 +14,8 @@ type LogConfig struct {
 func InitLog(env string, cfg *LogConfig) error {
 	formatter := &logrus.JSONFormatter{
 		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyLevel: "severity",
-			logrus.FieldKeyMsg:   "message",
+			// logrus.FieldKeyLevel: "severity",
+			logrus.FieldKeyMsg: "message",
 		},
 	}
 	logrus.SetFormatter(formatter)

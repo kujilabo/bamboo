@@ -2,15 +2,30 @@
 app:
   name: bamboo-request-controller
   metricsPort: 8081
-requestProducer:
-  type: kafka
-  kafka:
-    addr: localhost:29092
-resultSubscriber:
-  type: redis
-  redis:
-    addrs:
-      - localhost:6379
+workers:
+  worker1:
+    requestProducer:
+      type: kafka
+      kafka:
+        addr: localhost:29092
+        topic: topic1
+    resultSubscriber:
+      type: redis
+      redis:
+        addrs:
+          - localhost:6379
+  worker-redis-redis:
+    requestProducer:
+      type: redis
+      redis:
+        addrs:
+          - localhost:6379
+        channel: redis-redis
+    resultSubscriber:
+      type: redis
+      redis:
+        addrs:
+          - localhost:6379
 trace:
   exporter: jaeger
   jaeger:
