@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
@@ -14,12 +15,14 @@ import (
 )
 
 type redisBambooRequestProducer struct {
+	workerName      string
 	producerOptions redis.UniversalOptions
 	producerChannel string
 }
 
-func NewRedisBambooRequestProducer(producerOptions redis.UniversalOptions, producerChannel string) BambooRequestProducer {
+func NewRedisBambooRequestProducer(ctx context.Context, workerName string, producerOptions redis.UniversalOptions, producerChannel string) BambooRequestProducer {
 	return &redisBambooRequestProducer{
+		workerName:      workerName,
 		producerOptions: producerOptions,
 		producerChannel: producerChannel,
 	}
@@ -27,19 +30,24 @@ func NewRedisBambooRequestProducer(producerOptions redis.UniversalOptions, produ
 
 func (p *redisBambooRequestProducer) Produce(ctx context.Context, traceID, resultChannel string, data []byte) error {
 	logger := log.FromContext(ctx)
+	propagator := otel.GetTextMapPropagator()
+	headers := propagation.MapCarrier{}
 
-	producer := redis.NewUniversalClient(&p.producerOptions)
-	defer producer.Close()
+	spanCtx, span := tracer.Start(ctx, p.workerName)
+	defer span.End()
 
-	requestID, err := uuid.NewRandom()
-	if err != nil {
-		return liberrors.Errorf("uuid.NewRandom. err: %w", err)
+	propagator.Inject(spanCtx, headers)
+	logger.Infof("carrier: %+v", headers)
+	requestID, ok := ctx.Value("request_id").(string)
+	if !ok {
+		requestID = ""
 	}
 
 	req := pb.WorkerParameter{
-		RequestId:     requestID.String(),
-		TraceId:       traceID,
+		Headers:       headers,
+		RequestId:     requestID,
 		ResultChannel: resultChannel,
+		Version:       1,
 		Data:          data,
 	}
 	reqBytes, err := proto.Marshal(&req)
@@ -50,8 +58,11 @@ func (p *redisBambooRequestProducer) Produce(ctx context.Context, traceID, resul
 
 	logger.Infof("LPUSH %s", p.producerChannel)
 
+	producer := redis.NewUniversalClient(&p.producerOptions)
+	defer producer.Close()
+
 	if _, err := producer.LPush(ctx, p.producerChannel, reqStr).Result(); err != nil {
-		return liberrors.Errorf("LPush. err: %w", err)
+		return liberrors.Errorf("producer.LPush. err: %w", err)
 	}
 
 	return nil

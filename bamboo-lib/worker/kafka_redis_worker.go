@@ -8,6 +8,8 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
@@ -21,6 +23,7 @@ type kafkaRedisBambooWorker struct {
 	publisherOptions redis.UniversalOptions
 	workerFn         WorkerFn
 	numWorkers       int
+	propagator       propagation.TextMapPropagator
 }
 
 func NewKafkaRedisBambooWorker(consumerOptions kafka.ReaderConfig, publisherOptions redis.UniversalOptions, workerFn WorkerFn, numWorkers int) BambooWorker {
@@ -29,6 +32,7 @@ func NewKafkaRedisBambooWorker(consumerOptions kafka.ReaderConfig, publisherOpti
 		publisherOptions: publisherOptions,
 		workerFn:         workerFn,
 		numWorkers:       numWorkers,
+		propagator:       otel.GetTextMapPropagator(),
 	}
 }
 
@@ -74,10 +78,7 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 		for {
 			m, err := r.ReadMessage(ctx)
 			if err != nil {
-				if err := r.Close(); err != nil {
-					// log.Fatal("failed to close reader:", err)
-					return err
-				}
+				return err
 			}
 
 			if len(m.Key) == 0 && len(m.Value) == 0 {
@@ -87,19 +88,23 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 			// fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
 
 			req := pb.WorkerParameter{}
-
 			if err := proto.Unmarshal(m.Value, &req); err != nil {
 				logger.Warnf("invalid parameter. failed to proto.Unmarshal. err: %w", err)
 				continue
 			}
+			// jobCtx := context.Background()
+			var headers propagation.MapCarrier = req.Headers
+			// w.propagator.Extract(ctx, headers)
 
-			dispatcher.AddJob(&redisJob{
-				publisherOptions: w.publisherOptions,
-				workerFn:         w.workerFn,
-				TraceID:          req.TraceId,
-				parameter:        req.Data,
-				resultChannel:    req.ResultChannel,
-			})
+			// logger.Infof("carrier: %+v", headers)
+			// ctx = w.propagator.Extract(ctx, headers)
+			// go func() {
+			// 	_, span := tracer.Start(ctx, "consume message")
+			// 	defer span.End()
+			// 	time.Sleep(time.Second)
+			// }()
+
+			dispatcher.AddJob(NewRedisJob(ctx, headers, req.RequestId, w.publisherOptions, w.workerFn, req.Data, req.ResultChannel))
 		}
 	}
 

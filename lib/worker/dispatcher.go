@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 )
 
 type Dispatcher struct {
@@ -35,7 +34,6 @@ func (d *Dispatcher) Start(ctx context.Context, numWorkers int) {
 				}
 				return
 			case job := <-d.JobQueue:
-				fmt.Println("b")
 				worker := <-d.workerPool // wait for available worker
 				worker <- job            // dispatch job to worker
 			}

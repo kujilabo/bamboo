@@ -5,13 +5,13 @@ option go_package = "github.com/kujilabo/bamboo/bamboo-lib/proto";
 package proto;
 
 message WorkerParameter {
-  string  requestId = 1;
-  string  traceId = 2;
-  string resultChannel = 3;
-  bytes  data = 4;
-  int32  version = 5;
+  map<string, string> headers = 1;
+  string              requestId = 2;
+  string              resultChannel = 3;
+  int32               version = 4;
+  bytes               data = 5;
 }
 
 message WorkerResponse {
-  bytes  data = 1;
+  bytes data = 1;
 }

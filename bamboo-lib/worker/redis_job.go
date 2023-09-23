@@ -5,6 +5,10 @@ import (
 	"encoding/base64"
 
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
@@ -12,24 +16,49 @@ import (
 	"github.com/kujilabo/bamboo/lib/log"
 )
 
+type RedisJob interface {
+	Run() error
+}
+
 type redisJob struct {
+	carrier          propagation.MapCarrier
+	requestID        string
 	publisherOptions redis.UniversalOptions
 	workerFn         WorkerFn
-	TraceID          string
 	parameter        []byte
 	resultChannel    string
 }
 
+func NewRedisJob(ctx context.Context, carrier propagation.MapCarrier, requestID string, publisherOptions redis.UniversalOptions, workerFn WorkerFn, parameter []byte, resultChannel string) RedisJob {
+	return &redisJob{
+		carrier:          carrier,
+		requestID:        requestID,
+		publisherOptions: publisherOptions,
+		workerFn:         workerFn,
+		parameter:        parameter,
+		resultChannel:    resultChannel,
+	}
+}
+
 func (j *redisJob) Run() error {
-	ctx := log.With(context.Background(), log.Str("trace_id", j.TraceID))
+	propagator := otel.GetTextMapPropagator()
+	ctx := propagator.Extract(context.Background(), j.carrier)
+
+	opts := []oteltrace.SpanStartOption{
+		oteltrace.WithAttributes([]attribute.KeyValue{
+			{Key: "request_id", Value: attribute.StringValue(j.requestID)},
+		}...),
+		oteltrace.WithSpanKind(oteltrace.SpanKindConsumer),
+	}
+	ctx, span := tracer.Start(ctx, "Run", opts...)
+	defer span.End()
+
+	ctx = log.With(ctx, log.Str("request_id", j.requestID))
 
 	result, err := j.workerFn(ctx, j.parameter)
 	if err != nil {
-		return err
+		return liberrors.Errorf("workerFn. err: %w", err)
 	}
-
-	publisher := redis.NewUniversalClient(&j.publisherOptions)
-	defer publisher.Close()
 
 	resp := pb.WorkerResponse{
 		Data: result,
@@ -40,8 +69,10 @@ func (j *redisJob) Run() error {
 	}
 	respStr := base64.StdEncoding.EncodeToString(respBytes)
 
+	publisher := redis.NewUniversalClient(&j.publisherOptions)
+	defer publisher.Close()
 	if _, err := publisher.Publish(ctx, j.resultChannel, respStr).Result(); err != nil {
-		return err
+		return liberrors.Errorf("publisher.Publish. err: %w", err)
 	}
 
 	return nil

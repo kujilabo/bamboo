@@ -18,14 +18,16 @@ type ByteArreayResult struct {
 }
 
 type RedisResultSubscriber struct {
-	rdb redis.UniversalClient
+	workerName string
+	rdb        redis.UniversalClient
 }
 
-func NewRedisResultSubscriber(ctx context.Context, redisConfig redis.UniversalOptions) BambooResultSubscriber {
+func NewRedisResultSubscriber(ctx context.Context, workerName string, redisConfig redis.UniversalOptions) BambooResultSubscriber {
 	rdb := redis.NewUniversalClient(&redisConfig)
 
 	return &RedisResultSubscriber{
-		rdb: rdb,
+		workerName: workerName,
+		rdb:        rdb,
 	}
 }
 func (s *RedisResultSubscriber) Ping(ctx context.Context) error {

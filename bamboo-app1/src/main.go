@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/kujilabo/bamboo/bamboo-app1/src/config"
@@ -22,6 +22,8 @@ import (
 	libconfig "github.com/kujilabo/bamboo/lib/config"
 	"github.com/kujilabo/bamboo/lib/log"
 )
+
+var tracer = otel.Tracer("github.com/kujilabo/bamboo/bamboo-app1")
 
 func getValue(values ...string) string {
 	for _, v := range values {
@@ -126,7 +128,7 @@ func main() {
 
 	clients := map[string]client.WorkerClient{}
 	for k, v := range cfg.Workers {
-		clients[k] = client.CreateWorkerClient(ctx, v)
+		clients[k] = client.CreateWorkerClient(ctx, k, v)
 		defer clients[k].Close(ctx)
 	}
 
@@ -141,12 +143,12 @@ func main() {
 
 			spanCtx, span := tracer.Start(ctx, "TraceLog")
 			defer span.End()
-			sc := trace.SpanFromContext(spanCtx).SpanContext()
-			if !sc.TraceID().IsValid() || !sc.SpanID().IsValid() {
-				return
+			requestID, err := uuid.NewRandom()
+			if err != nil {
+				panic(err)
 			}
 
-			logCtx := log.With(ctx, log.Str("trace_id", sc.TraceID().String()))
+			logCtx := log.With(spanCtx, log.Str("request_id", requestID.String()))
 			logger := log.FromContext(logCtx)
 			logger.Info("Start")
 
@@ -154,10 +156,10 @@ func main() {
 				app: &app,
 			}
 
-			c := e.worker1(spanCtx, 3, 5)
-			d := e.worker1(spanCtx, c, 3)
-			f := e.worker1(spanCtx, d, 2)
-			g := e.workerRedisRedis(spanCtx, f, 9)
+			c := e.worker1(logCtx, 3, 5)
+			d := e.worker1(logCtx, c, 3)
+			f := e.worker1(logCtx, d, 2)
+			g := e.workerRedisRedis(logCtx, f, 9)
 
 			fmt.Println(c)
 			fmt.Println(d)

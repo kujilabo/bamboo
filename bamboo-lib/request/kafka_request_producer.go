@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
@@ -14,10 +16,11 @@ import (
 )
 
 type kafkaBambooRequestProducer struct {
-	writer *kafka.Writer
+	workerName string
+	writer     *kafka.Writer
 }
 
-func NewKafkaBambooRequestProducer(addr, topic string) BambooRequestProducer {
+func NewKafkaBambooRequestProducer(ctx context.Context, workerName, addr, topic string) BambooRequestProducer {
 	writer := &kafka.Writer{
 		Addr:     kafka.TCP(addr),
 		Topic:    topic,
@@ -31,27 +34,29 @@ func NewKafkaBambooRequestProducer(addr, topic string) BambooRequestProducer {
 
 func (p *kafkaBambooRequestProducer) Produce(ctx context.Context, traceID, resultChannel string, data []byte) error {
 	logger := log.FromContext(ctx)
+	propagator := otel.GetTextMapPropagator()
+	headers := propagation.MapCarrier{}
 
-	requestID, err := uuid.NewRandom()
+	spanCtx, span := tracer.Start(ctx, p.workerName)
+	defer span.End()
+
+	propagator.Inject(spanCtx, headers)
+	logger.Infof("carrier: %+v", headers)
+	requestID, ok := ctx.Value("request_id").(string)
+	if !ok {
+		requestID = ""
+	}
+
+	messageID, err := uuid.NewRandom()
 	if err != nil {
 		return liberrors.Errorf("uuid.NewRandom. err: %w", err)
 	}
 
-	// dataJson, err := json.Marshal(data)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// req := ApplicationRequest{
-	// 	RequestID:     requestID.String(),
-	// 	TraceID:       traceID,
-	// 	ResultChannel: resultChannel,
-	// 	Data:          data,
-	// }
 	req := pb.WorkerParameter{
-		RequestId:     requestID.String(),
-		TraceId:       traceID,
+		Headers:       headers,
+		RequestId:     requestID,
 		ResultChannel: resultChannel,
+		Version:       1,
 		Data:          data,
 	}
 	reqBytes, err := proto.Marshal(&req)
@@ -60,18 +65,14 @@ func (p *kafkaBambooRequestProducer) Produce(ctx context.Context, traceID, resul
 	}
 	reqStr := base64.StdEncoding.EncodeToString(reqBytes)
 
-	// reqBytes, err := json.Marshal(req)
-	// if err != nil {
-	// 	return liberrors.Errorf("json.Marshal. err: %w", err)
-	// }
 	logger.Infof("SEND %s", reqStr)
 
-	if err := p.writer.WriteMessages(context.Background(),
-		kafka.Message{
-			Key:   []byte(requestID.String()),
-			Value: reqBytes,
-		},
-	); err != nil {
+	msg := kafka.Message{
+		Key:   []byte(messageID.String()),
+		Value: reqBytes,
+	}
+
+	if err := p.writer.WriteMessages(spanCtx, msg); err != nil {
 		return liberrors.Errorf("WriteMessages. err: %w", err)
 	}
 

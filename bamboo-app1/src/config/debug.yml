@@ -1,6 +1,6 @@
 ---
 app:
-  name: bamboo-request-controller
+  name: bamboo-app1
   metricsPort: 8081
 workers:
   worker1:

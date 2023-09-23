@@ -2,17 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_library(
     name = "src_lib",
-    srcs = [
-        "init.go",
-        "main.go",
-    ],
+    srcs = ["main.go"],
     importpath = "github.com/kujilabo/bamboo/bamboo-app1/src",
     visibility = ["//visibility:private"],
     deps = [
         "//bamboo-app1/src/config",
         "//bamboo-lib/client",
-        "//bamboo-lib/request",
-        "//bamboo-lib/result",
         "//bamboo-worker-redis-redis/src/proto",
         "//bamboo-worker1/src/proto",
         "//lib/config",
@@ -22,7 +17,6 @@ go_library(
         "@io_opentelemetry_go_otel//:otel",
         "@io_opentelemetry_go_otel//propagation",
         "@io_opentelemetry_go_otel_sdk//trace",
-        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_golang_google_protobuf//proto",
     ],
 )

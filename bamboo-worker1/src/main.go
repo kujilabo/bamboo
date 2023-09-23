@@ -27,6 +27,8 @@ import (
 	"github.com/kujilabo/bamboo/lib/worker"
 )
 
+var tracer = otel.Tracer("github.com/kujilabo/bamboo/bamboo-worker1")
+
 func getValue(values ...string) string {
 	for _, v := range values {
 		if len(v) != 0 {
@@ -133,6 +135,9 @@ func initialize(ctx context.Context, mode string) (*config.Config, *sdktrace.Tra
 }
 
 func workerFn(ctx context.Context, reqBytes []byte) ([]byte, error) {
+	_, span := tracer.Start(ctx, "worker1.fn")
+	defer span.End()
+
 	logger := log.FromContext(ctx)
 
 	req := pb.Worker1Parameter{}

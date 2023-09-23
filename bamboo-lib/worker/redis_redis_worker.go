@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
@@ -65,7 +65,7 @@ func (w *redisRedisBambooWorker) Run(ctx context.Context) error {
 		consumer := redis.NewUniversalClient(&w.publisherOptions)
 		defer consumer.Close()
 
-		fmt.Println("START")
+		logger.Info("START")
 		for {
 			m, err := consumer.BRPop(ctx, 0, w.consumerChannel).Result()
 			if err != nil {
@@ -89,13 +89,9 @@ func (w *redisRedisBambooWorker) Run(ctx context.Context) error {
 				continue
 			}
 
-			dispatcher.AddJob(&redisJob{
-				publisherOptions: w.publisherOptions,
-				workerFn:         w.workerFn,
-				TraceID:          req.TraceId,
-				parameter:        req.Data,
-				resultChannel:    req.ResultChannel,
-			})
+			var headers propagation.MapCarrier = req.Headers
+
+			dispatcher.AddJob(NewRedisJob(ctx, headers, req.RequestId, w.publisherOptions, w.workerFn, req.Data, req.ResultChannel))
 		}
 	}
 
@@ -110,6 +106,6 @@ func (w *redisRedisBambooWorker) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("END")
+	logger.Info("END")
 	return nil
 }
