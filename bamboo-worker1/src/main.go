@@ -22,6 +22,7 @@ import (
 	"github.com/kujilabo/bamboo/bamboo-worker1/src/config"
 	pb "github.com/kujilabo/bamboo/bamboo-worker1/src/proto"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
+	liberrors "github.com/kujilabo/bamboo/lib/errors"
 	"github.com/kujilabo/bamboo/lib/log"
 	"github.com/kujilabo/bamboo/lib/worker"
 )
@@ -39,7 +40,7 @@ type SleepJob struct {
 	wg *sync.WaitGroup
 }
 
-func (j *SleepJob) Run(ctx context.Context) error {
+func (j *SleepJob) Run() error {
 	time.Sleep(time.Second * 5)
 	j.wg.Done()
 	return nil
@@ -136,63 +137,18 @@ func workerFn(ctx context.Context, reqBytes []byte) ([]byte, error) {
 
 	req := pb.Worker1Parameter{}
 	if err := proto.Unmarshal(reqBytes, &req); err != nil {
-		logger.Info("%+v", err)
+		logger.Errorf("proto.Unmarshal %+v", err)
 		return nil, errors.New("adddd")
 	}
 
-	// data := map[string]int{}
-	// if err := json.Unmarshal([]byte(reqBytes), &data); err != nil {
-	// 	logger.Errorf("xxxxxxxxxxxxxxxxx " + string(reqBytes))
-	// 	return nil, errors.New("adddd")
-	// }
-
-	// answer := data["x"] * data["y"]
-
 	answer := req.X * req.Y
+	logger.Infof("answer: %d", answer)
 	resp := pb.Worker1Response{Value: answer}
 	respBytes, err := proto.Marshal(&resp)
 	if err != nil {
-		logger.Errorf("%+v", err)
-		return nil, err
+		logger.Errorf("proto.Marshal. err: %w", err)
+		return nil, liberrors.Errorf("proto.Marshal. err: %w", err)
 	}
 
 	return respBytes, nil
 }
-
-// func requestReader(ctx context.Context, kafkaReaderConfig kafka.ReaderConfig, fn bambooworker.WorkerFn) error {
-// 	r := kafka.NewReader(kafkaReaderConfig)
-
-// 	for {
-// 		m, err := r.ReadMessage(ctx)
-// 		if err != nil {
-// 			if err := r.Close(); err != nil {
-// 				log.Fatal("failed to close reader:", err)
-// 				return err
-// 			}
-// 		}
-// 		fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
-
-// 		req := bamboorequest.ApplicationRequest{}
-// 		if err := json.Unmarshal(m.Value, &req); err != nil {
-// 			return err
-// 		}
-
-// 		resData, err := fn(ctx, req.Data)
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 		fmt.Println("xxx")
-
-// 		rdb := redis.NewUniversalClient(&redis.UniversalOptions{
-// 			Addrs:    []string{"localhost:6379"},
-// 			Password: "", // no password set
-// 		})
-// 		defer rdb.Close()
-
-// 		result := rdb.Publish(ctx, req.ReceiverID, resData)
-// 		if result.Err() != nil {
-// 			return result.Err()
-// 		}
-// 	}
-// }

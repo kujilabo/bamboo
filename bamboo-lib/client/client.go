@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"time"
 
@@ -18,7 +17,7 @@ type BambooPrameter interface {
 
 type WorkerClient interface {
 	Produce(ctx context.Context, traceID, redisChannel string, data []byte) error
-	SubscribeString(ctx context.Context, redisChannel string, timeout time.Duration) (string, error)
+	Subscribe(ctx context.Context, redisChannel string, timeout time.Duration) ([]byte, error)
 	Ping(ctx context.Context) error
 	Close(ctx context.Context)
 }
@@ -39,8 +38,8 @@ func (c *workerClient) Produce(ctx context.Context, traceID, redisChannel string
 	return c.rp.Produce(ctx, traceID, redisChannel, data)
 }
 
-func (c *workerClient) SubscribeString(ctx context.Context, redisChannel string, timeout time.Duration) (string, error) {
-	return c.rs.SubscribeString(ctx, redisChannel, timeout)
+func (c *workerClient) Subscribe(ctx context.Context, redisChannel string, timeout time.Duration) ([]byte, error) {
+	return c.rs.Subscribe(ctx, redisChannel, timeout)
 }
 
 func (c *workerClient) Ping(ctx context.Context) error {
@@ -77,13 +76,7 @@ func (c *StandardClient) Call(ctx context.Context, traceID, clientName string, p
 
 	ch := make(chan result.ByteArreayResult)
 	go func() {
-		resultStr, err := client.SubscribeString(ctx, redisChannel, timeout)
-		if err != nil {
-			ch <- result.ByteArreayResult{Value: nil, Error: err}
-			return
-		}
-
-		resultBytes, err := base64.StdEncoding.DecodeString(resultStr)
+		resultBytes, err := client.Subscribe(ctx, redisChannel, timeout)
 		if err != nil {
 			ch <- result.ByteArreayResult{Value: nil, Error: err}
 			return

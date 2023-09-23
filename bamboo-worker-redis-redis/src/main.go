@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,6 +20,8 @@ import (
 	"github.com/kujilabo/bamboo/bamboo-worker-redis-redis/src/config"
 	pb "github.com/kujilabo/bamboo/bamboo-worker-redis-redis/src/proto"
 	libconfig "github.com/kujilabo/bamboo/lib/config"
+	liberrors "github.com/kujilabo/bamboo/lib/errors"
+	"github.com/kujilabo/bamboo/lib/log"
 )
 
 func getValue(values ...string) string {
@@ -111,18 +112,26 @@ func initialize(ctx context.Context, mode string) (*config.Config, *sdktrace.Tra
 }
 
 func workerFn(ctx context.Context, reqBytes []byte) ([]byte, error) {
-	data := map[string]int{}
-	if err := json.Unmarshal([]byte(reqBytes), &data); err != nil {
+	logger := log.FromContext(ctx)
+
+	req := pb.RedisRedisParameter{}
+	if err := proto.Unmarshal(reqBytes, &req); err != nil {
+		logger.Errorf("proto.Unmarshal %+v", err)
 		return nil, errors.New("adddd")
 	}
 
-	answer := data["x"] + data["y"]
+	// data := map[string]int{}
+	// if err := json.Unmarshal([]byte(reqBytes), &data); err != nil {
+	// 	return nil, errors.New("adddd")
+	// }
 
-	res := map[string]int{"value": answer}
-	resJson, err := json.Marshal(res)
+	answer := req.X * req.Y
+	logger.Infof("answer: %d", answer)
+	resp := pb.RedisRedisResponse{Value: answer}
+	respBytes, err := proto.Marshal(&resp)
 	if err != nil {
-		return nil, err
+		return nil, liberrors.Errorf("proto.Marshal. err: %w", err)
 	}
 
-	return []byte(resJson), nil
+	return respBytes, nil
 }

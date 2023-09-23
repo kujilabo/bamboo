@@ -6,7 +6,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.19.1
 	github.com/gin-contrib/cors v1.4.0
 	github.com/go-playground/validator/v10 v10.15.4
-	github.com/kujilabo/cocotola/lib v0.0.0-20230103151530-04b30421bd09
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/sirupsen/logrus v1.9.3
 	go.opentelemetry.io/otel v1.18.0

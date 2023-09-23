@@ -2,16 +2,15 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"google.golang.org/protobuf/proto"
 
-	bamboorequest "github.com/kujilabo/bamboo/bamboo-lib/request"
+	pb "github.com/kujilabo/bamboo/bamboo-lib/proto"
 	liberrors "github.com/kujilabo/bamboo/lib/errors"
 	"github.com/kujilabo/bamboo/lib/log"
 	libworker "github.com/kujilabo/bamboo/lib/worker"
@@ -58,6 +57,7 @@ func (w *kafkaRedisBambooWorker) ping(ctx context.Context) error {
 }
 
 func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
+	logger := log.FromContext(ctx)
 	operation := func() error {
 		if err := w.ping(ctx); err != nil {
 			return err
@@ -70,7 +70,7 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 		r := kafka.NewReader(w.consumerOptions)
 		defer r.Close()
 
-		fmt.Println("START")
+		logger.Info("START")
 		for {
 			m, err := r.ReadMessage(ctx)
 			if err != nil {
@@ -84,58 +84,36 @@ func (w *kafkaRedisBambooWorker) Run(ctx context.Context) error {
 				return errors.New("Conn error")
 			}
 
-			fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
+			// fmt.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
 
-			req := bamboorequest.ApplicationRequest{}
-			if err := json.Unmarshal(m.Value, &req); err != nil {
-				return err
+			req := pb.WorkerParameter{}
+
+			if err := proto.Unmarshal(m.Value, &req); err != nil {
+				logger.Warnf("invalid parameter. failed to proto.Unmarshal. err: %w", err)
+				continue
 			}
-			logCtx := log.With(ctx, log.Str("request_id", req.RequestID))
 
-			dispatcher.AddJob(logCtx, &redisJob{
+			dispatcher.AddJob(&redisJob{
 				publisherOptions: w.publisherOptions,
 				workerFn:         w.workerFn,
+				TraceID:          req.TraceId,
 				parameter:        req.Data,
 				resultChannel:    req.ResultChannel,
 			})
 		}
 	}
 
-	// backOff := backoff.WithContext(r.newBackOff(), req.Context())
-	// backOff := &backoff.ZeroBackOff{}
 	backOff := backoff.NewExponentialBackOff()
 	backOff.MaxElapsedTime = 0
 
 	notify := func(err error, d time.Duration) {
-		// logger.Debug().Msgf("New attempt %d for request: %v", attempts, req.URL)
-
-		// r.listener.Retried(req, attempts)
-		fmt.Println(err)
+		logger.Errorf("notify %+v", err)
 	}
 
 	err := backoff.RetryNotify(operation, backOff, notify)
 	if err != nil {
-		// logger.Debug().Err(err).Msg("Final retry attempt failed")
 		return err
 	}
-	fmt.Println("END")
+	logger.Info("END")
 	return nil
 }
-
-// func newBackOff() backoff.BackOff {
-// 	if r.attempts < 2 || r.initialInterval <= 0 {
-// 		return &backoff.ZeroBackOff{}
-// 	}
-
-// 	b := backoff.NewExponentialBackOff()
-// 	b.InitialInterval = r.initialInterval
-
-// 	// calculate the multiplier for the given number of attempts
-// 	// so that applying the multiplier for the given number of attempts will not exceed 2 times the initial interval
-// 	// it allows to control the progression along the attempts
-// 	b.Multiplier = math.Pow(2, 1/float64(r.attempts-1))
-
-// 	// according to docs, b.Reset() must be called before using
-// 	b.Reset()
-// 	return b
-// }

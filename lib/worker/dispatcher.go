@@ -47,6 +47,6 @@ func (d *Dispatcher) Stop(ctx context.Context) {
 	d.Quit <- true
 }
 
-func (d *Dispatcher) AddJob(ctx context.Context, job Job) {
+func (d *Dispatcher) AddJob(job Job) {
 	d.JobQueue <- job
 }

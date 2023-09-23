@@ -13,12 +13,13 @@ go_library(
     importpath = "github.com/kujilabo/bamboo/bamboo-lib/worker",
     visibility = ["//visibility:public"],
     deps = [
-        "//bamboo-lib/request",
+        "//bamboo-lib/proto",
         "//lib/errors",
         "//lib/log",
         "//lib/worker",
         "@com_github_cenkalti_backoff_v4//:backoff",
         "@com_github_redis_go_redis_v9//:go-redis",
         "@com_github_segmentio_kafka_go//:kafka-go",
+        "@org_golang_google_protobuf//proto",
     ],
 )

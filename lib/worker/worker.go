@@ -6,7 +6,7 @@ import (
 )
 
 type Job interface {
-	Run(ctx context.Context) error
+	Run() error
 }
 
 type Worker struct {
@@ -32,7 +32,7 @@ func (w *Worker) Start(ctx context.Context) {
 
 			select {
 			case job := <-w.jobQueue:
-				if err := job.Run(ctx); err != nil {
+				if err := job.Run(); err != nil {
 					fmt.Println(err)
 				}
 			case <-w.quit:

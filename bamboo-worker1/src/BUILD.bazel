@@ -10,6 +10,7 @@ go_library(
         "//bamboo-worker1/src/config",
         "//bamboo-worker1/src/proto",
         "//lib/config",
+        "//lib/errors",
         "//lib/log",
         "//lib/worker",
         "@com_github_redis_go_redis_v9//:go-redis",

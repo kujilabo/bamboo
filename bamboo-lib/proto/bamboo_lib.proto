@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/kujilabo/bamboo/bamboo-worker-redis-redis/proto";
+option go_package = "github.com/kujilabo/bamboo/bamboo-lib/proto";
 
 package proto;
 
