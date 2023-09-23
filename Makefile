@@ -90,13 +90,19 @@ gen-proto:
 
 .PHONY: update-mod
 update-mod:
-	@pushd ./bamboo-app1/ && \
+	@pushd ./lib/ && \
 		go get -u ./... && \
 	popd
 	@pushd ./bamboo-lib/ && \
 		go get -u ./... && \
 	popd
-	@pushd ./lib/ && \
+	@pushd ./bamboo-worker1/ && \
+		go get -u ./... && \
+	popd
+	@pushd ./bamboo-worker-redis-redis/ && \
+		go get -u ./... && \
+	popd
+	@pushd ./bamboo-app1/ && \
 		go get -u ./... && \
 	popd
 
