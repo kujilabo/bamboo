@@ -29,8 +29,8 @@ func (d *Dispatcher) Start(ctx context.Context, numWorkers int) {
 		for {
 			select {
 			case <-d.Quit:
-				for _, w := range workers {
-					w.Stop(ctx)
+				for i := range workers {
+					workers[i].Stop(ctx)
 				}
 				return
 			case job := <-d.JobQueue:

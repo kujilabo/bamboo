@@ -17,7 +17,7 @@ import (
 )
 
 type RedisJob interface {
-	Run() error
+	Run(ctx context.Context) error
 }
 
 type redisJob struct {
@@ -40,9 +40,9 @@ func NewRedisJob(ctx context.Context, carrier propagation.MapCarrier, requestID 
 	}
 }
 
-func (j *redisJob) Run() error {
+func (j *redisJob) Run(ctx context.Context) error {
 	propagator := otel.GetTextMapPropagator()
-	ctx := propagator.Extract(context.Background(), j.carrier)
+	ctx = propagator.Extract(ctx, j.carrier)
 
 	opts := []oteltrace.SpanStartOption{
 		oteltrace.WithAttributes([]attribute.KeyValue{
@@ -60,9 +60,7 @@ func (j *redisJob) Run() error {
 		return liberrors.Errorf("workerFn. err: %w", err)
 	}
 
-	resp := pb.WorkerResponse{
-		Data: result,
-	}
+	resp := pb.WorkerResponse{Data: result}
 	respBytes, err := proto.Marshal(&resp)
 	if err != nil {
 		return liberrors.Errorf("proto.Marshal. err: %w", err)
